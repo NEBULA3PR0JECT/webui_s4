@@ -1,0 +1,231 @@
+from dash import Dash, dcc, html, ctx, dash_table
+from dash.dependencies import Input, Output, State
+import dash_bootstrap_components as dbc
+import time
+from pytube import YouTube 
+import glob
+
+app = Dash(__name__,external_stylesheets=[dbc.themes.SLATE])
+local_files = []
+for i in glob.glob("/datasets/msrvtt/*"):
+    #print(local_files)
+    local_files.append({"fname": i, "path":"msrvtt"})
+video_or_image_lable = "Image/Video"
+video_or_image = []
+batch_url_list = []
+batch_name_list = []
+#local_files = []
+table_header = [
+    html.Thead(html.Tr([html.Th("File"), html.Th("URL"), html.Th("Type")]))
+]
+st_layout = dbc.Table(table_header , bordered=False, dark=True, id='url_table')
+
+app.layout = html.Div(
+    [
+        dbc.Navbar(dark = True, color="dark",children=[html.H3('NEBULA3 Pipeline')]),
+        dbc.Row(dbc.Col(html.H1(style={"margin-left": "30%", "margin-top": "25px"},children=''))), 
+        dbc.Row(
+            [
+                #dbc.Col(),
+                dbc.Col(
+                [dbc.Input(
+                id="input_url",
+                type="url",
+                placeholder="ENTER VIDEO URL",
+                ),
+                dbc.Switch(label=video_or_image_lable, id='v_or_i', style={"margin-left": "5px"}),
+                html.P(id="standalone-radio-check-output"),
+                ]),
+                dbc.Col(dbc.ButtonGroup(children=
+                    [
+                    dbc.Button('Preview Video/Image', id='url_p', n_clicks=0), 
+                    dbc.Button('Add to batch', id='url_d', n_clicks=0, style={"margin-left": "5px"})
+                    # dbc.Button('Clean Batch', id='url_clean', n_clicks=0, style={"margin-left": "5px"}),
+                    # dbc.Button('Browse Files', id='url_modal', n_clicks=0, style={"margin-left": "5px"}),
+                    # dbc.Button('Start Pipeline', id='url_s', n_clicks=0, style={"margin-left": "5px"})
+                    ]))
+                #dbc.Col()
+            ],
+            style={"margin-top": "25px", "margin-left": "15%"}
+        ),
+        dbc.Row(
+            [
+                dbc.Col(id='preview_layout',style={"margin-left": "15%","margin-right": "15%","margin-top":"20px"}, 
+                children="")
+            ]
+        ),
+        dbc.Row(
+            [
+               dbc.Col(dbc.ButtonGroup(children=
+                    [
+                    dbc.Button('Clean Batch', id='url_clean', n_clicks=0),
+                    dbc.Button('Browse Files', id='url_browse', n_clicks=0, style={"margin-left": "5px"}),
+                    dbc.Button('Start Pipeline', id='url_s', n_clicks=0, style={"margin-left": "5px"}),
+                    dbc.Button('Jobs status', id='url_mon', n_clicks=0, style={"margin-left": "5px"})
+                    ]))
+            ],
+            style={"margin-top": "25px", "margin-left": "15%"}
+        ),
+        dbc.Row(
+            [
+                dbc.Col(id='main_layout',style={"margin-left": "15%","margin-right": "40%","margin-top":"20px"}, 
+                children=dbc.Table(table_header, bordered=False, dark=True, id='url_table'))
+            ]
+        ),      
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Local Dataset")),
+                dbc.ModalBody(children= dash_table.DataTable(id='files_table',
+                columns=[
+                        {"name":"File name", "id": "fname"}, {"name": "Dataset", "id": "path"}
+                        ],
+                        style_header={
+                            'backgroundColor': 'rgb(30, 30, 30)',
+                            'color': 'dark'
+                            },
+                        style_data={
+                            'backgroundColor': 'rgb(30, 30, 30)',
+                            'color': 'dark'
+                            },
+                        data=local_files,
+                        editable=True,
+                        #filter_action="native",
+                        sort_action="native",
+                        sort_mode="multi",
+                        column_selectable="single",
+                        row_selectable="multi",
+                        row_deletable=True,
+                        selected_columns=[],
+                        selected_rows=[],
+                        page_action="native",
+                        page_current= 0,
+                        page_size= 30,
+                )),
+            ],
+            id="modal-xl",
+            size="xl",
+            is_open=False,
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(
+                    dbc.ModalTitle("Status"), close_button=True
+                ),
+                dbc.ModalBody(
+                    "Job Started!"
+                ),
+                dbc.ModalFooter(),
+            ],
+            id="modal-dismiss",
+            #is_open=False,
+        )
+    ]
+)
+
+@app.callback(
+    Output("modal-dismiss", "is_open"),
+    [Input("url_s", "n_clicks")],
+    [State("modal-dismiss", "is_open")],
+)
+def toggle_modal(n1, is_open):
+    print("Start job")
+    if n1:
+        return not is_open
+    return is_open
+
+@app.callback(
+    Output("modal-xl", "is_open"),
+    Input("url_browse", "n_clicks"),
+    State("modal-xl", "is_open"),
+)
+def toggle_browser(n1, is_open):
+    print(local_files)
+    if n1:
+        return not is_open
+    return is_open
+
+@app.callback(Output('v_or_i', 'disabled'),
+             Input("url_d", component_property='n_clicks'),
+             Input("url_clean", component_property='n_clicks'))
+def set_button_enabled_state(on_, off_):
+    if "url_d" == ctx.triggered_id:
+        return True
+    if "url_clean" == ctx.triggered_id:
+        return False
+
+@app.callback(
+    Output("standalone-radio-check-output","children"),
+    Input("v_or_i", component_property='value')
+    #Input("url_d", component_property='n_clicks')
+    #prevent_initial_call=True
+)
+def switch_layout(*val):
+    if val[0]:
+        video_or_image.clear()
+        video_or_image.append("Video")
+        return "Processing Video..."
+    else:
+        print("Image")
+        video_or_image.clear()
+        video_or_image.append("Image")
+        return "Processing Image/Frame..."
+
+@app.callback(
+    Output("main_layout", "children"),
+    Input("input_url", "value"),
+    #Input("url_p", component_property='n_clicks'),
+    Input("url_d", component_property='n_clicks'),
+    #Input("url_s", component_property='n_clicks'),
+    Input("url_clean", component_property='n_clicks'),
+    #Input("v_or_i", component_property='value'),
+    prevent_initial_call=True
+)
+
+def main_layout(*val):
+    print(val)    
+    table_body = [html.Tbody(batch_name_list)]
+    st_layout = dbc.Table(table_header + table_body, bordered=False, dark=True, id='url_table')
+    if "url_clean" == ctx.triggered_id:
+        batch_name_list.clear()
+        batch_url_list.clear()
+        st_layout = ['Batch list cleared... Add new URL\'s to batch ']
+        return st_layout
+    if "url_d" == ctx.triggered_id:
+        if val[0]:
+            row = html.Tr([html.Td( val[0].split("/")[-1]), html.Td( val[0]),video_or_image[0]])
+            batch_name_list.append(row)
+            batch_url_list.append(val[0])
+            table_body = [html.Tbody(batch_name_list)]
+        #st_layout = [dbc.Checklist(options=batch_name_list)]
+            st_layout = dbc.Table(table_header + table_body, bordered=False, dark=True, id='url_table')
+        return st_layout
+    else:
+        print("No video")
+        return st_layout
+    
+@app.callback(
+    Output("preview_layout", "children"),
+    Input("input_url", "value"),
+    Input("url_p", component_property='n_clicks')
+    )
+def preview(*val):
+    print(val)
+    st_layout = [' ']
+    if val[0]:
+        if "url_p" == ctx.triggered_id:
+            print("DEBUG ", video_or_image[0])
+            if "youtu" in val[0]:
+                url_ = YouTube(val[0])
+                st_layout = [html.Img(src=url_.thumbnail_url, height=600)]
+                return st_layout
+                #print(url_.thumbnail_url)
+            if video_or_image[0] == "Video":
+                st_layout = [html.Video(src=val[0],controls=True, height=600)]
+                return st_layout
+            elif video_or_image[0] == "Image":
+                st_layout = [html.Img(src=val[0], height=600)]
+                return st_layout 
+    
+
+if __name__ == "__main__":
+    app.run_server(host="0.0.0.0",debug=True ), 
