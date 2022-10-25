@@ -4,8 +4,16 @@ import dash_bootstrap_components as dbc
 import time
 from pytube import YouTube 
 import glob
+import base64
+import requests
 
+
+j_status = []
+j_status.append("")
 app = Dash(__name__,external_stylesheets=[dbc.themes.SLATE])
+image_filename = 'marvel-nebula-png-picture-stock-nebula-guardians-of-the-galaxy-cartoo-11562973029avtizra9bu.png' # replace with your own image
+#encoded_image = base64.b64encode(open(image_filename, 'rb').read())
+#print(encoded_image)
 local_files = []
 for i in glob.glob("/datasets/msrvtt/*"):
     #print(local_files)
@@ -15,6 +23,25 @@ video_or_image = []
 batch_url_list = []
 batch_name_list = []
 #local_files = []
+
+def start_job():
+    movies = []
+    headers = {'Content-type': 'application/json'}
+    for movie in batch_url_list:
+        _movie = {"movie_id": "", "url": movie, "type": "file"}
+        movies.append(_movie)
+    payload = {"movies": movies,
+    "save_movies": 'true', # if you want to save movies/frames on disk
+    "output" : "db",
+    "is_async": 'true',
+    "overwrite": 'true' # to overwrite existing results - re-run
+    }
+    print(payload)
+    response = requests.post('http://74.82.28.218:48005/process/movies', json=payload, headers=headers)
+    return response.json()
+
+
+
 table_header = [
     html.Thead(html.Tr([html.Th("File"), html.Th("URL"), html.Th("Type")]))
 ]
@@ -112,7 +139,7 @@ app.layout = html.Div(
                     dbc.ModalTitle("Status"), close_button=True
                 ),
                 dbc.ModalBody(
-                    "Job Started!"
+                    "Job status: ", id="status"
                 ),
                 dbc.ModalFooter(),
             ],
@@ -124,14 +151,23 @@ app.layout = html.Div(
 
 @app.callback(
     Output("modal-dismiss", "is_open"),
+    Output("status","children"),
     [Input("url_s", "n_clicks")],
     [State("modal-dismiss", "is_open")],
 )
 def toggle_modal(n1, is_open):
-    print("Start job")
+    _js = ""
     if n1:
-        return not is_open
-    return is_open
+        if len(batch_url_list) != 0:
+            _js = "Job Started"
+            print("Start job")
+            resp = start_job()
+            batch_url_list.clear()
+            print(resp)
+        else:
+            _js = "Please add URL to batch!"
+        return (not is_open,_js)
+    return (is_open,_js)
 
 @app.callback(
     Output("modal-xl", "is_open"),
@@ -175,7 +211,7 @@ def switch_layout(*val):
     Input("input_url", "value"),
     #Input("url_p", component_property='n_clicks'),
     Input("url_d", component_property='n_clicks'),
-    #Input("url_s", component_property='n_clicks'),
+    Input("url_s", component_property='n_clicks'),
     Input("url_clean", component_property='n_clicks'),
     #Input("v_or_i", component_property='value'),
     prevent_initial_call=True
@@ -185,7 +221,7 @@ def main_layout(*val):
     print(val)    
     table_body = [html.Tbody(batch_name_list)]
     st_layout = dbc.Table(table_header + table_body, bordered=False, dark=True, id='url_table')
-    if "url_clean" == ctx.triggered_id:
+    if "url_clean" == ctx.triggered_id or "url_s" == ctx.triggered_id :
         batch_name_list.clear()
         batch_url_list.clear()
         st_layout = ['Batch list cleared... Add new URL\'s to batch ']
@@ -225,7 +261,9 @@ def preview(*val):
             elif video_or_image[0] == "Image":
                 st_layout = [html.Img(src=val[0], height=600)]
                 return st_layout 
-    
+    else:
+        st_layout = [html.Img(src='https://upload.wikimedia.org/wikipedia/en/thumb/0/0c/Karen_Gillan_as_Nebula.png/220px-Karen_Gillan_as_Nebula.png')]
+        return st_layout
 
 if __name__ == "__main__":
     app.run_server(host="0.0.0.0",debug=True ), 
