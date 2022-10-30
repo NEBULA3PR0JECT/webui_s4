@@ -6,6 +6,8 @@ from pytube import YouTube
 import glob
 import base64
 import requests
+from gradient import WorkflowsClient
+import yaml
 
 w_server = 'http://74.82.29.209:9000/msrvtt/'
 j_status = []
@@ -18,6 +20,10 @@ local_files = []
 for i in glob.glob("/datasets/msrvtt/*"):
     #print(local_files)
     local_files.append({"fname": i, "path":"msrvtt"})
+local_files_hw = []
+for i in glob.glob("//datasets/hollywood2/Hollywood2/AVIClips/*"):
+    #print(local_files)
+    local_files_hw.append({"fname": i, "path":"hw2"})
 video_or_image_lable = "Image/Video"
 video_or_image = []
 video_or_image.append('video')
@@ -25,7 +31,7 @@ batch_url_list = []
 batch_name_list = []
 #local_files = []
 
-def start_job():
+def start_job_rest():
     movies = []
     headers = {'Content-type': 'application/json'}
     for movie in batch_url_list:
@@ -41,7 +47,22 @@ def start_job():
     response = requests.post('http://74.82.28.218:48005/process/movies', json=payload, headers=headers)
     return response.json()
 
+def start_job():
+    gk = '5d88bfa5909b30076829c101624d67'
 
+    workflow_client = WorkflowsClient(gk)
+
+    spec_path = "./workflow-spec.yaml"
+
+    yaml_spec = open(spec_path, 'r')
+    spec = yaml.safe_load(yaml_spec)
+
+    print(workflow_client.run_workflow(
+        workflow_id='553d666c-2306-4bf3-a3db-9bd1275a9657',
+        spec=spec,
+        cluster_id='clg07azjl',
+        inputs=None
+    ))
 
 table_header = [
     html.Thead(html.Tr([html.Th("File"), html.Th("URL"), html.Th("Source")]))
@@ -112,7 +133,7 @@ app.layout = html.Div(
         ),      
         dbc.Modal(
             [
-                dbc.ModalHeader(dbc.ModalTitle("Local Dataset")),
+                dbc.ModalHeader(dbc.ModalTitle("Local Dataset MSRVTT, selected files will be added to batch")),
                 dbc.ModalBody(children= dash_table.DataTable(id='files_table',
                 columns=[
                         {"name":"File name", "id": "fname"}, {"name": "Dataset", "id": "path"}
@@ -141,6 +162,40 @@ app.layout = html.Div(
                 )),
             ],
             id="modal-xl",
+            size="xl",
+            is_open=False,
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Local HW2 Dataset, selected files will be added to batch")),
+                dbc.ModalBody(children= dash_table.DataTable(id='files_table_hw',
+                columns=[
+                        {"name":"File name", "id": "fname"}, {"name": "Dataset", "id": "path"}
+                        ],
+                        style_header={
+                            'backgroundColor': 'rgb(30, 30, 30)',
+                            'color': 'dark'
+                            },
+                        style_data={
+                            'backgroundColor': 'rgb(30, 30, 30)',
+                            'color': 'dark'
+                            },
+                        data=local_files_hw,
+                        editable=True,
+                        #filter_action="native",
+                        sort_action="native",
+                        sort_mode="multi",
+                        column_selectable="single",
+                        row_selectable="multi",
+                        row_deletable=True,
+                        selected_columns=[],
+                        selected_rows=[],
+                        page_action="native",
+                        page_current= 0,
+                        page_size= 30,
+                )),
+            ],
+            id="modal-xl-hw",
             size="xl",
             is_open=False,
         ),
@@ -181,9 +236,9 @@ def toggle_modal(n1, is_open):
     return (is_open,_js)
 
 @app.callback(
-    Output("modal-xl", "is_open"),
-    Input("url_browse", "n_clicks"),
-    State("modal-xl", "is_open"),
+    Output("modal-xl-hw", "is_open"),
+    Input("url_browse_h", "n_clicks"),
+    State("modal-xl-hw", "is_open"),
 )
 def toggle_browser(n1, is_open):
     #print(local_files)
@@ -191,6 +246,16 @@ def toggle_browser(n1, is_open):
         return not is_open
     return is_open
 
+@app.callback(
+    Output("modal-xl", "is_open"),
+    Input("url_browse", "n_clicks"),
+    State("modal-xl", "is_open"),
+)
+def toggle_browser_h(n1, is_open):
+    #print(local_files)
+    if n1:
+        return not is_open
+    return is_open
 # @app.callback(Output('v_or_i', 'disabled'),
 #              Input("url_d", component_property='n_clicks'),
 #              Input("url_clean", component_property='n_clicks'))
@@ -261,10 +326,12 @@ def preview(*val):
     Input("url_s", component_property='n_clicks'),
     Input("url_clean", component_property='n_clicks'),
     Input('files_table', 'derived_virtual_selected_rows'),
+    Input('files_table_hw', 'derived_virtual_selected_rows'),
     #Input("v_or_i", component_property='value'),
     prevent_initial_call=True
 )
-def main_layout(*val):   
+def main_layout(*val):  
+    print(*val) 
     table_body = [html.Tbody(batch_name_list)]
     st_layout = dbc.Table(table_header + table_body, bordered=False, dark=True, id='url_table')
     if "url_clean" == ctx.triggered_id or "url_s" == ctx.triggered_id :
@@ -281,13 +348,23 @@ def main_layout(*val):
         #st_layout = [dbc.Checklist(options=batch_name_list)]
             st_layout = dbc.Table(table_header + table_body, bordered=False, dark=True, id='url_table')
         return st_layout
-    if val[4]:
+    if val[4] or val[5]:
         batch_name_list.clear()
-        for r in val[4]:
-            print(local_files[r]['fname'])
-            f_name = local_files[r]['fname'].split("/")[-1]
-            row = html.Tr([html.Td(f_name), html.Td(w_server + f_name),"MSRVTT"])
-            batch_name_list.append(row)
+        if val[4]:  
+            for r in val[4]:
+                print(local_files[r]['fname'])
+                f_name = local_files[r]['fname'].split("/")[-1]
+                row = html.Tr([html.Td(f_name), html.Td(w_server + f_name),"MSRVTT"])
+                batch_name_list.append(row)
+            #table_body = [html.Tbody(batch_name_list)]
+            #st_layout = dbc.Table(table_header + table_body, bordered=False, dark=True, id='url_table')
+            #return st_layout
+        if val[5]:
+            for r in val[5]:
+                print(local_files_hw[r]['fname'])
+                f_name = local_files_hw[r]['fname'].split("/")[-1]
+                row = html.Tr([html.Td(f_name), html.Td(w_server + f_name),"MSRVTT"])
+                batch_name_list.append(row)
         table_body = [html.Tbody(batch_name_list)]
         st_layout = dbc.Table(table_header + table_body, bordered=False, dark=True, id='url_table')
         return st_layout
