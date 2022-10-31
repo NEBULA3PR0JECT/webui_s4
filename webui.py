@@ -1,15 +1,20 @@
+from ast import increment_lineno
 from dash import Dash, dcc, html, ctx, dash_table
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
-import time
+import json
 from pytube import YouTube 
 import glob
 import base64
 import requests
 from gradient import WorkflowsClient
 import yaml
+import uuid
+from arango import ArangoClient
 
+arango_host = "http://172.83.9.249:8529"
 w_server = 'http://74.82.29.209:9000/msrvtt/'
+hw2_w_server = 'http://74.82.29.209:9000/datasets/hollywood2/Hollywood2/AVIClips/'
 j_status = []
 j_status.append("")
 app = Dash(__name__,external_stylesheets=[dbc.themes.SLATE])
@@ -29,8 +34,24 @@ video_or_image = []
 video_or_image.append('video')
 batch_url_list = []
 batch_name_list = []
-#local_files = []
+movies = ""
+wf_template = {
+  "movies": [],
+  "tasks": {},
+  "inputs": {
+    "videoprocessing": {
+      "is_async": 'true',
+      "movies": movies,
+      "output": "db",
+      "overwrite": 'true',
+      "save_movies": 'true'
+    }
+  }
+}
 
+client = ArangoClient(hosts=arango_host)
+db = client.db("prodemo", username='nebula', password='nebula')
+   
 def start_job_rest():
     movies = []
     headers = {'Content-type': 'application/json'}
@@ -48,21 +69,42 @@ def start_job_rest():
     return response.json()
 
 def start_job():
-    gk = '5d88bfa5909b30076829c101624d67'
-
-    workflow_client = WorkflowsClient(gk)
-
-    spec_path = "./workflow-spec.yaml"
-
-    yaml_spec = open(spec_path, 'r')
+    movies = []
+    gradient_key = '5d88bfa5909b30076829c101624d67'
+    workflow_client = WorkflowsClient(gradient_key)
+    
+    for movie in batch_url_list:
+        if video_or_image[0] == "image":
+            _movie = {"movie_id": "", "url": movie, "type": "image"}
+        if video_or_image[0] == "video":
+            _movie = {"movie_id": "", "url": movie, "type": "video"}
+        movies.append(_movie)
+    pipeline_entry = wf_template
+    pipeline_entry['inputs']['videoprocessing']['movies'] =  movies
+   
+    pipeline_entry['id'] = str(uuid.uuid4())
+    pipeline_entry['_key'] = pipeline_entry['id']
+    db.collection("pipelines").insert(pipeline_entry)
+    spec_path_in = "./" + pipeline_entry['id'] + "_workflow-spec.yaml"
+    URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/sprint4.yaml"
+    response = requests.get(URL)
+    content = response.text.replace("PIPELINE_ID: \"123456789\"","PIPELINE_ID: " + pipeline_entry['id'])
+    #print(content)
+    f = open(spec_path_in, "w")
+    f.write(content)
+    f.close()
+    # spec_path = "./workflow-spec.yaml"
+    yaml_spec = open(spec_path_in, 'r')
     spec = yaml.safe_load(yaml_spec)
 
-    print(workflow_client.run_workflow(
-        workflow_id='553d666c-2306-4bf3-a3db-9bd1275a9657',
+    #print(pipeline_entry)
+    intermediate_value = workflow_client.run_workflow(
+        workflow_id='cdc9127e-6c61-43b2-95fc-ba3ea1708950',
         spec=spec,
-        cluster_id='clg07azjl',
         inputs=None
-    ))
+    )
+    intermediate_value['pipeline_id'] = pipeline_entry['id']
+    return(intermediate_value)
 
 table_header = [
     html.Thead(html.Tr([html.Th("File"), html.Th("URL"), html.Th("Source")]))
@@ -202,7 +244,7 @@ app.layout = html.Div(
         dbc.Modal(
             [
                 dbc.ModalHeader(
-                    dbc.ModalTitle("Status"), close_button=True
+                    dbc.ModalTitle("Start Status"), close_button=True
                 ),
                 dbc.ModalBody(
                     "Job status: ", id="status"
@@ -211,75 +253,112 @@ app.layout = html.Div(
             ],
             id="modal-dismiss",
             #is_open=False,
-        )
+        ),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(
+                    dbc.ModalTitle("Job Status"), close_button=True
+                ),
+                dbc.ModalBody(
+                    "Job status: ", id="job_status"
+                ),
+                dbc.ModalFooter(),
+            ],
+            id="modal-job-status",
+            size="xl",
+            #is_open=False,
+        ),        
+        dcc.Store(id='intermediate-value')
     ]
 )
 
 @app.callback(
     Output("modal-dismiss", "is_open"),
     Output("status","children"),
-    [Input("url_s", "n_clicks")],
+    Output('intermediate-value', 'data'),
+    [Input("url_s", "n_clicks"),Input('intermediate-value', 'data')],
     [State("modal-dismiss", "is_open")],
 )
-def toggle_modal(n1, is_open):
+def toggle_modal(n1, intermediate_value, is_open):
     _js = ""
+    print(n1," ", is_open, " ", intermediate_value)
+    if intermediate_value:
+        resp_json = intermediate_value
+    else:
+        resp_json = []
     if n1:
         if len(batch_url_list) != 0:
             _js = "Job Started"
             print("Start job")
             resp = start_job()
             batch_url_list.clear()
-            print(resp)
+            batch_name_list.clear()
+            #print("RESPONCE")
+            resp_json.append(resp)
+            #print(resp_json)
         else:
             _js = "Please add URL to batch!"
-        return (not is_open,_js)
-    return (is_open,_js)
+        return (not is_open,_js,resp_json)
+    return (is_open,_js,resp_json)
 
 @app.callback(
     Output("modal-xl-hw", "is_open"),
+    #Output('files_table', "selected_rows"),
+    Output('files_table', "selected_rows"),
     Input("url_browse_h", "n_clicks"),
     State("modal-xl-hw", "is_open"),
 )
 def toggle_browser(n1, is_open):
     #print(local_files)
     if n1:
-        return not is_open
-    return is_open
+        return not is_open, []
+    return is_open, []
 
 @app.callback(
     Output("modal-xl", "is_open"),
+    Output('files_table_hw', "selected_rows"),
+    #Output('files_table_hw', "selected_rows"),
     Input("url_browse", "n_clicks"),
     State("modal-xl", "is_open"),
 )
 def toggle_browser_h(n1, is_open):
     #print(local_files)
     if n1:
+        return not is_open, []
+    return is_open, []
+
+@app.callback(
+    Output("modal-job-status", "is_open"),
+    #Output("job_status", 'children'),
+    Input("url_mon", "n_clicks"),
+    #Input('intermediate-value', 'data'),
+    State("modal-job-status", "is_open"),
+)
+def toggle_job_status(n1, is_open): #, intermediate_value):
+    if n1:
         return not is_open
     return is_open
-# @app.callback(Output('v_or_i', 'disabled'),
-#              Input("url_d", component_property='n_clicks'),
-#              Input("url_clean", component_property='n_clicks'))
-# def set_button_enabled_state(on_, off_):
-#     if "url_d" == ctx.triggered_id:
-#         return True
-#     if "url_clean" == ctx.triggered_id:
-#         return False
 
-# @app.callback(
-#     Output("standalone-radio-check-output","children"),
-#     Input("v_or_i", component_property='value')
-
-# )
-# def switch_layout(*val):
-#     if val[0]:
-#         video_or_image.clear()
-#         video_or_image.append("Video")
-#         return "Processing Video..."
-#     else:
-#         print("Image")
-#         video_or_image.clear()
-#         video_or_image.append("Image")
-#         return "Processing Image/Frame..."
+@app.callback(
+    Output("job_status", 'children'),
+    Input('intermediate-value', 'data'),
+    Input("url_mon", "n_clicks"),
+)
+def return_job_status(intermediate_value, n1):
+    #print(intermediate_value)
+    jobs = []
+    mock_job = 'pipelines/20e23280-d291-421c-a480-ed6e567afe83'
+    if len(intermediate_value) > 0:
+        for job in intermediate_value:
+            #print(job)
+            job_id = job['pipeline_id']
+            print(job_id)
+            
+            jobs_info = db.collection("pipelines").get(job_id)
+            jobs.append(jobs_info)
+            #for job_info in jobs_info:
+        print("STAUS FROM DB ", jobs)
+    return(jobs)
 
 @app.callback(
     Output("preview_layout", "children"),
@@ -287,9 +366,14 @@ def toggle_browser_h(n1, is_open):
     Input("url_p", component_property='n_clicks')
     )
 def preview(*val):
-    print(val)
     st_layout = [' ']
     if val[0]:
+        if "youtu" in val[0]:
+            video_or_image[0] = "youtube"
+        if val[0].split('.')[-1] == 'mp4' or val[0].split('.')[-1] == 'avi':
+            video_or_image[0] = "video"    
+        else:
+            video_or_image[0] = "image"
         if "url_p" == ctx.triggered_id:
             #print("DEBUG ", video_or_image[0])
             if "youtu" in val[0]:
@@ -310,15 +394,6 @@ def preview(*val):
         #st_layout = [html.Img(src='https://upload.wikimedia.org/wikipedia/en/thumb/0/0c/Karen_Gillan_as_Nebula.png/220px-Karen_Gillan_as_Nebula.png')]
         return st_layout
 
-# @app.callback(
-#     Output("main_layout", "children"),
-#     Input('files_table', 'selected_columns')
-# )
-# def return_files(selected_columns):
-#     for i in selected_columns:
-#         print(i)
-#     return()
-
 @app.callback(
     Output("main_layout", "children"),
     Input("input_url", "value"),
@@ -332,11 +407,12 @@ def preview(*val):
 )
 def main_layout(*val):  
     print(*val) 
-    table_body = [html.Tbody(batch_name_list)]
-    st_layout = dbc.Table(table_header + table_body, bordered=False, dark=True, id='url_table')
+    table_body = []
+    st_layout = ""
     if "url_clean" == ctx.triggered_id or "url_s" == ctx.triggered_id :
         batch_name_list.clear()
         batch_url_list.clear()
+        table_body = []
         st_layout = ['Batch list cleared... Add new URL\'s to batch ']
         return st_layout
     if "url_d" == ctx.triggered_id:
@@ -350,21 +426,21 @@ def main_layout(*val):
         return st_layout
     if val[4] or val[5]:
         batch_name_list.clear()
+        batch_url_list.clear()
         if val[4]:  
             for r in val[4]:
                 print(local_files[r]['fname'])
                 f_name = local_files[r]['fname'].split("/")[-1]
                 row = html.Tr([html.Td(f_name), html.Td(w_server + f_name),"MSRVTT"])
                 batch_name_list.append(row)
-            #table_body = [html.Tbody(batch_name_list)]
-            #st_layout = dbc.Table(table_header + table_body, bordered=False, dark=True, id='url_table')
-            #return st_layout
+                batch_url_list.append(w_server + f_name)
         if val[5]:
             for r in val[5]:
                 print(local_files_hw[r]['fname'])
                 f_name = local_files_hw[r]['fname'].split("/")[-1]
-                row = html.Tr([html.Td(f_name), html.Td(w_server + f_name),"MSRVTT"])
+                row = html.Tr([html.Td(f_name), html.Td(hw2_w_server + f_name),"HW2"])
                 batch_name_list.append(row)
+                batch_url_list.append(hw2_w_server + f_name)
         table_body = [html.Tbody(batch_name_list)]
         st_layout = dbc.Table(table_header + table_body, bordered=False, dark=True, id='url_table')
         return st_layout
