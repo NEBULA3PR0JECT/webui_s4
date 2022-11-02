@@ -346,19 +346,41 @@ def toggle_job_status(n1, is_open): #, intermediate_value):
 )
 def return_job_status(intermediate_value, n1):
     #print(intermediate_value)
+    status_layout = ""
+    status_header = [
+    html.Thead(html.Tr([html.Th("Job ID"), html.Th("Job Status"), html.Th("Movie ID"), html.Th("Movie Status")]))
+    ]
+    
+    #jobs_table = dbc.Table(table_header , bordered=False, dark=True, id='url_table')
     jobs = []
+    job_stat= "RUNNING"
     mock_job = 'pipelines/20e23280-d291-421c-a480-ed6e567afe83'
     if len(intermediate_value) > 0:
         for job in intermediate_value:
+            movies = []
+            mv_stat = "UNKNOW"
             #print(job)
             job_id = job['pipeline_id']
             print(job_id)
-            
+            #job_id = mock_job
             jobs_info = db.collection("pipelines").get(job_id)
-            jobs.append(jobs_info)
+            if 'tasks' in jobs_info:
+                if 'videoprocessing' in jobs_info['tasks']:
+                    job_stat = jobs_info['tasks']['videoprocessing']
+            row = html.Tr([html.Td(job_id), html.Td(job_stat), html.Td(""), html.Td("")])
+            jobs.append(row)
+            if 'movies' in jobs_info:
+                if len(jobs_info['movies']) > 0:
+                    print(jobs_info['movies'])
+                    for mv in jobs_info['movies']:
+                        row_m =  html.Tr([html.Td(""), html.Td(""), html.Td(mv), html.Td(jobs_info['movies'][mv]['status']['videoprocessing'])])
+                        movies.append(row_m)
+                    jobs = jobs + movies 
             #for job_info in jobs_info:
-        print("STAUS FROM DB ", jobs)
-    return(jobs)
+        jobs_table = [html.Tbody(jobs)]
+        status_layout = dbc.Table(status_header + jobs_table, bordered=False, dark=True, id='jobs_table')
+        print("STAUS FROM DB ", status_layout)
+    return(status_layout)
 
 @app.callback(
     Output("preview_layout", "children"),
