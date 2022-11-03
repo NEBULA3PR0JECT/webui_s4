@@ -36,7 +36,7 @@ batch_url_list = []
 batch_name_list = []
 movies = ""
 wf_template = {
-  "movies": [],
+  "movies": {},
   "tasks": {},
   "inputs": {
     "videoprocessing": {
@@ -88,7 +88,7 @@ def start_job():
     spec_path_in = "./" + pipeline_entry['id'] + "_workflow-spec.yaml"
     URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/sprint4.yaml"
     response = requests.get(URL)
-    content = response.text.replace("PIPELINE_ID: \"123456789\"","PIPELINE_ID: " + pipeline_entry['id'])
+    content = response.text.replace("PIPELINE_ID: \"123456789\"","PIPELINE_ID: " + "\"" + pipeline_entry['id'] + "\"")
     #print(content)
     f = open(spec_path_in, "w")
     f.write(content)
@@ -262,7 +262,7 @@ app.layout = html.Div(
                 dbc.ModalBody(
                     "Job status: ", id="job_status"
                 ),
-                dbc.ModalFooter(),
+                dbc.ModalFooter(dbc.Button('All successed jobs', id='all_jobs', n_clicks=0, style={"margin-left": "5px"})),
             ],
             id="modal-job-status",
             size="xl",
@@ -288,16 +288,18 @@ def toggle_modal(n1, intermediate_value, is_open):
         resp_json = []
     if n1:
         if len(batch_url_list) != 0:
-            _js = "Job Started"
             print("Start job")
             resp = start_job()
             batch_url_list.clear()
             batch_name_list.clear()
             #print("RESPONCE")
             resp_json.append(resp)
-            #print(resp_json)
+            _js = "Job Started, pipeline id: " + resp['pipeline_id']
+            
         else:
             _js = "Please add URL to batch!"
+        batch_name_list.clear()
+        batch_url_list.clear()
         return (not is_open,_js,resp_json)
     return (is_open,_js,resp_json)
 
@@ -431,7 +433,10 @@ def main_layout(*val):
     print(*val) 
     table_body = []
     st_layout = ""
-    if "url_clean" == ctx.triggered_id or "url_s" == ctx.triggered_id :
+    if "url_s" == ctx.triggered_id:
+        st_layout = ['Add new URL\'s to batch ']
+        return st_layout
+    if "url_clean" == ctx.triggered_id:
         batch_name_list.clear()
         batch_url_list.clear()
         table_body = []
@@ -450,14 +455,16 @@ def main_layout(*val):
         batch_name_list.clear()
         batch_url_list.clear()
         if val[4]:  
-            for r in val[4]:
+            mylist = list( dict.fromkeys(val[4]))
+            for r in mylist:
                 print(local_files[r]['fname'])
                 f_name = local_files[r]['fname'].split("/")[-1]
                 row = html.Tr([html.Td(f_name), html.Td(w_server + f_name),"MSRVTT"])
                 batch_name_list.append(row)
                 batch_url_list.append(w_server + f_name)
         if val[5]:
-            for r in val[5]:
+            mylist = list( dict.fromkeys(val[5]))
+            for r in mylist:
                 print(local_files_hw[r]['fname'])
                 f_name = local_files_hw[r]['fname'].split("/")[-1]
                 row = html.Tr([html.Td(f_name), html.Td(hw2_w_server + f_name),"HW2"])
