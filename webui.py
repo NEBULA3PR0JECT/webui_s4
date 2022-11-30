@@ -12,12 +12,17 @@ import yaml
 import uuid
 from arango import ArangoClient
 import dash_cytoscape as cyto
+from gradient import WorkflowsClient
 
 arango_host = "http://172.83.9.249:8529"
 w_server = 'http://74.82.29.209:9000/msrvtt/'
 hw2_w_server = 'http://74.82.29.209:9000/datasets/hollywood2/Hollywood2/AVIClips/'
 web_server_prefix = 'http://74.82.29.209:9000/'
 movie_id = ""
+api_key='fdcd43409325ce4d47e6dc1aa911df'
+workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
+project_id = 'pizybutannx'
+workflow_client = WorkflowsClient(api_key)
 
 j_status = []
 j_status.append("")
@@ -57,7 +62,11 @@ wf_template = {
 client = ArangoClient(hosts=arango_host)
 db = client.db("prodemo", username='nebula', password='nebula')
 
-
+def get_workflow_gradient():
+    all_wfs =  workflow_client.list_runs(workflow_id=workflow_id)
+    for wf in all_wfs:
+        print(wf)
+    
 def start_job_rest():
     movies = []
     headers = {'Content-type': 'application/json'}
@@ -70,7 +79,7 @@ def start_job_rest():
                "is_async": 'true',
                "overwrite": 'true'  # to overwrite existing results - re-run
                }
-    print(payload)
+    #print(payload)
     response = requests.post(
         'http://74.82.28.218:48005/process/movies', json=payload, headers=headers)
     return response.json()
@@ -139,12 +148,12 @@ def get_movies():
         results.append(res)
         results_idx.append(res['movie_id'])
     for movie in db.collection("Movies").all():
-        print(movie)
+        #print(movie)
         if movie['_id'] in results_idx:
             if 'name' in movie and 'url_path' in movie:
                 movies.append({'path': movie['url_path'], 'id': movie['_id']})
-        else:
-            print('Not found in res: ', movie['_id'])
+        #else:
+            #print('Not found in res: ', movie['_id'])
     return(movies[::-1], results)
 
 def get_mdfs(movie_id):
@@ -156,6 +165,8 @@ def get_mdfs(movie_id):
 
 all_movies, all_results = get_movies()
 pipelines_ok, pipelines_failed = get_pipelines()
+all_workflows = get_workflow_gradient()
+print("FW: ",all_workflows)
 
 table_header = [
     html.Thead(html.Tr([html.Th("File"), html.Th("URL"), html.Th("Source")]))
@@ -388,38 +399,36 @@ mdf_rbuttons = dbc.RadioItems(
 ),
 
 mdf_graph = cyto.Cytoscape(
-        id='cytoscape-two-nodes',
+        id='cytoscape-mdf',
         layout={'name': 'preset'},
         style={'width': '100%', 'height': '400px'},
         elements=[
-            {'data': {'id': 'one', 'label': 'Node 1'}, 'position': {'x': 75, 'y': 75}},
-            {'data': {'id': 'two', 'label': 'Node 2'}, 'position': {'x': 200, 'y': 200}},
-            {'data': {'source': 'one', 'target': 'two'}}
         ]
     )
 
 mdfs_data = html.Div(
     [
-        dbc.Row("Text dddddddddddddddddd ddddddddddddddddddd"),
+        dbc.Row(mdf_rbuttons),
+        dbc.Row(""),
         dbc.Row(mdf_carousel),
-        dbc.Row(mdf_graph),
-        dbc.Row(mdf_rbuttons)
+        dbc.Row(mdf_graph)
     ])
 
+graph_data = dcc.Store(id='graph-data')
 
 results_layout = [
-    dbc.Row(
-        [
-            dbc.Col(
-                [
-                    dcc.Dropdown(pipelines_ok, id='pipelines-dropdown',),
-                    dbc.Button('Refresh movies', id='refresh_movies',
-                               n_clicks=0, style={"margin-top": "5px"}),
-                    dbc.Button('Refresh jobs', id='refresh_jobs',
-                               n_clicks=0, style={"margin-top": "5px"})
-                ], style={"margin-left": "5px", "margin-right": "50%", "margin-bottom": "20px"})
-        ],
-    ),
+    # dbc.Row(
+    #     [
+    #         dbc.Col(
+    #             [
+    #                 #dcc.Dropdown([{"label":"SELECTED", "value": "SELECTED"}], id='pipelines-dropdown',),
+    #                 dbc.Button('Refresh movies', id='refresh_movies',
+    #                            n_clicks=0, style={"margin-top": "5px"}),
+    #                 # dbc.Button('Refresh jobs', id='refresh_jobs',
+    #                 #            n_clicks=0, style={"margin-top": "5px"})
+    #             ], style={"margin-left": "5px", "margin-right": "50%", "margin-bottom": "20px"})
+    #     ],
+    # ),
     # dbc.Row(
     # [
     #     dbc.Col(movies_table)
@@ -433,7 +442,8 @@ results_layout = [
         ]
     ),
     dbc.Row(
-        [dbc.Button('View results', id='view_results', n_clicks=0)], style={"margin-top": "5px", "margin-right": "85%", "margin-left": "5px"}),
+        dbc.ButtonGroup(children=[dbc.Button('View', id='view_results', n_clicks=0), dbc.Button('Refresh', id='refresh_movies',
+        n_clicks=0)]), style={"margin-top": "5px", "margin-right": "85%", "margin-left": "5px"}),
     dbc.Modal(
         [
             dbc.ModalHeader(
@@ -447,7 +457,8 @@ results_layout = [
         is_open=False,
         id="view_mdf",
         size="xl",
-    )
+    ),
+    graph_data
 ]
 
 
@@ -493,7 +504,7 @@ main_layout = html.Div(
                         style={"margin-left": "10%", "margin-right": "20%", "margin-top": "40px"}),
                 dbc.Tab(results_layout, label="Results Browser", tab_id="tab-2",
                         style={"margin-left": "10%", "margin-right": "0%", "margin-top": "40px"}),
-                dbc.Tab(label="Results Statistics", tab_id="tab-3",
+                dbc.Tab(label="Benchmark", tab_id="tab-3",
                         style={"margin-left": "10%", "margin-right": "0%", "margin-top": "40px"}),
                 dbc.Tab(label="Jobs Data", tab_id="tab-4",
                         style={"margin-left": "20%", "margin-right": "10%", "margin-top": "40px"}),
@@ -523,14 +534,14 @@ app.layout = main_layout
 )
 def toggle_modal(n1, intermediate_value, is_open):
     _js = ""
-    print(n1, " ", is_open, " ", intermediate_value)
+    #print(n1, " ", is_open, " ", intermediate_value)
     if intermediate_value:
         resp_json = intermediate_value
     else:
         resp_json = []
     if n1:
         if len(batch_url_list) != 0:
-            print("Start job")
+            #print("Start job")
             resp = start_job()
             batch_url_list.clear()
             batch_name_list.clear()
@@ -559,6 +570,33 @@ def toggle_browser(n1, is_open):
         return not is_open, []
     return is_open, []
 
+# @app.callback(
+#     Output('pipelines-dropdown', "options"),
+#     Input("refresh_jobs", "n_clicks"),
+#     Input("tabs","active_tab")
+# )
+# def refresh_jobs(n1, at):
+#     pipelines = [{"label":"SELECTED", "value": "SELECTED"}]
+#     if "refresh_jobs" == ctx.triggered_id:
+#         #pipelines, pipelines_failed = get_pipelines()
+#         return(pipelines)
+#     if at == "tab-2":
+#         #pipelines, pipelines_failed = get_pipelines()
+#         return(pipelines)
+
+@app.callback(
+    Output('movies_table', "data"),
+    Input("refresh_movies", "n_clicks"),
+    Input("tabs","active_tab")
+)
+def refresh_movies(n1, at):
+    if "refresh_movies" == ctx.triggered_id:
+        all_movies, all_results = get_movies()
+        return(all_movies)
+    if at == "tab-2":
+        all_movies, all_results = get_movies()
+        print(all_movies)
+        return(all_movies)
 
 @app.callback(
     Output("modal-xl", "is_open"),
@@ -610,7 +648,7 @@ def return_job_status(intermediate_value, n1):
             mv_stat = "UNKNOW"
             #print(job)
             job_id = job['pipeline_id']
-            print(job_id)
+            #print(job_id)
             #job_id = mock_job
             jobs_info = db.collection("pipelines").get(job_id)
             if 'tasks' in jobs_info:
@@ -631,7 +669,7 @@ def return_job_status(intermediate_value, n1):
         jobs_table = [html.Tbody(jobs)]
         status_layout = dbc.Table(
             status_header + jobs_table, bordered=False, dark=True, id='jobs_table')
-        print("STAUS FROM DB ", status_layout)
+        #print("STAUS FROM DB ", status_layout)
     return(status_layout)
 
 
@@ -682,7 +720,7 @@ def preview(*val):
     prevent_initial_call=True
 )
 def main_layout(*val):
-    print(*val)
+    #print(*val)
     table_body = []
     st_layout = ""
     if "url_s" == ctx.triggered_id:
@@ -711,7 +749,7 @@ def main_layout(*val):
         if val[4]:
             mylist = list(dict.fromkeys(val[4]))
             for r in mylist:
-                print(local_files[r]['fname'])
+                #print(local_files[r]['fname'])
                 f_name = local_files[r]['fname'].split("/")[-1]
                 row = html.Tr(
                     [html.Td(f_name), html.Td(w_server + f_name), "MSRVTT"])
@@ -720,7 +758,7 @@ def main_layout(*val):
         if val[5]:
             mylist = list(dict.fromkeys(val[5]))
             for r in mylist:
-                print(local_files_hw[r]['fname'])
+                #print(local_files_hw[r]['fname'])
                 f_name = local_files_hw[r]['fname'].split("/")[-1]
                 row = html.Tr([html.Td(f_name), html.Td(
                     hw2_w_server + f_name), "HW2"])
@@ -731,7 +769,7 @@ def main_layout(*val):
                               bordered=False, dark=True, id='url_table')
         return st_layout
     else:
-        print("No video")
+        #print("No video")
         return st_layout
 
 
@@ -741,10 +779,10 @@ def main_layout(*val):
     Input('movies_table', 'derived_virtual_selected_rows'),
 )
 def preview_res(*val):
-
+    all_movies, all_results = get_movies()
     if val[0]:
         movie_idx = val[0][0]
-        print(movie_idx)
+        #print(movie_idx)
         st_layout = []
         if 'http' in all_movies[movie_idx]['path']:
             url_path = all_movies[movie_idx]['path']
@@ -782,7 +820,7 @@ def view_mdfs(n1, is_open):
 
 @app.callback(
     Output('mdfs_slider', 'children'),
-    #Output('mdfs_index', 'children'),
+    Output('graph-data', 'data'),
     Input('movie-id', 'data')
 )
 def return_mdfs_carousel(movie_id):
@@ -794,21 +832,10 @@ def return_mdfs_carousel(movie_id):
 
     for i, mdf in enumerate(mdfs):
         #print("DEBUG MDF ", mdf)
-        mdf_items.append({"key":str(i), "src":mdf['url'],"caption":mdf['candidate'], "header": "Frame number: " + str(mdf['frame_num']), "img_style":{"max-height":"500px"}})#,"max-width":"600px"}})
-        mdf_options.append({"label":"MDF: " + str(i), "value": i})
-        mdf_triplets.append(mdf['triplets'])
-    
-   
-    for i, mdf in enumerate(mdf_triplets):
-        for j, triple in enumerate(mdf):
-            prev_id = "none"
-            for m, node in enumerate(triple):
-                print(node)
-                id = str(i) + "_" + str(j) + "_" + str(m)
-                mdf_elements.append({'data': {'id': id, 'label': node}})
-                if prev_id != "none":
-                    mdf_elements.append({'data': {'source': prev_id, 'target': id}})
-                prev_id = id
+        mdf_items.append({"key":str(i), "src":mdf['url'],"caption":mdf['candidate'], "header": "Frame " + str(mdf['frame_num']), "img_style":{"max-height":"320px",'align': 'center',"max-width":"320px"}})#,"max-width":"600px"}})
+        mdf_options.append({"label":"MDF" + str(i), "value": i})
+        if 'triplets' in mdf:
+            mdf_triplets.append(mdf['triplets'])
     
     mdf_carousel = dbc.Carousel(
         items=mdf_items,
@@ -827,28 +854,42 @@ def return_mdfs_carousel(movie_id):
     #print(mdf_elements[0])
     mdf_graph = cyto.Cytoscape(
         id='cytoscape-mdf',
-        layout={'name': 'concentric'},
+        layout={'name': 'grid'},
         style={'width': '100%', 'height': '400px'},
         elements=mdf_elements
     )
 
     mdfs_data = html.Div(
         [
+            dbc.Row(mdf_rbuttons, style={'margin-top': '20px'}),
             dbc.Row("Movie ID: " + movie_id['id'], style={'margin-top': '20px'}),
             dbc.Row(mdf_carousel, style={'margin-top': '20px'}),
-            dbc.Row(mdf_graph, style={'margin-top': '20px'}),
-            dbc.Row(mdf_rbuttons, style={'margin-top': '20px'})
+            dbc.Row(mdf_graph, style={'margin-top': '20px'})
         ])
-    return(mdfs_data)
+    return(mdfs_data,mdf_triplets)
 
 
 @app.callback(
     Output("mdfs_car", "active_index"),
+    Output("cytoscape-mdf", "elements"),
     Input("mdf-number", "value"),
+    Input('graph-data','data')
 )
-def select_slide(idx):
-    print(idx)
-    return idx
+def select_slide(idx, graph_element):
+    mdf_elements = []
+    if len(graph_element) > 0:
+        print("Graph Element:", graph_element[idx])
+        graph_for_mdf =  graph_element[idx]
+        for j, triple in enumerate(graph_for_mdf):
+            prev_id = "none"
+            for m, node in enumerate(triple):
+                #print(node)
+                id = str(i) + "_" + str(j) + "_" + str(m)
+                mdf_elements.append({'data': {'id': id, 'label': node}})
+                if prev_id != "none":
+                    mdf_elements.append({'data': {'source': prev_id, 'target': id}})
+                prev_id = id
+    return(idx, mdf_elements)
 
 
 if __name__ == "__main__":
