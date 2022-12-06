@@ -13,6 +13,10 @@ import uuid
 from arango import ArangoClient
 import dash_cytoscape as cyto
 from gradient import WorkflowsClient
+from views.config import ConfigView
+from views.pipeline import PipelineView
+from views.results import ResultsView
+from views.jobs import JobsView
 
 arango_host = "http://172.83.9.249:8529"
 w_server = 'http://74.82.29.209:9000/msrvtt/'
@@ -67,6 +71,12 @@ def get_workflow_gradient():
     for wf in all_wfs:
         print(wf)
     
+# create view components
+config_view = ConfigView()
+pipeline_view = PipelineView(db)
+results_view = ResultsView(db)
+jobs_view = JobsView()
+
 def start_job_rest():
     movies = []
     headers = {'Content-type': 'application/json'}
@@ -173,172 +183,6 @@ table_header = [
 ]
 st_layout = dbc.Table(table_header, bordered=False, dark=True, id='url_table')
 
-pipeline_layout = [
-    #dbc.Navbar(dark = True, color="dark",children=[html.H3('NEBULA3 Pipeline')]),
-    #dbc.Row(dbc.Col(html.H1(style={"margin-left": "30%", "margin-top": "25px"},children=''))),
-    dbc.Row(
-        [
-            #dbc.Col(),
-            dbc.Col(
-                [dbc.Input(
-                    id="input_url",
-                    type="url",
-                    placeholder="ENTER VIDEO/IMAGE URL",
-                ),
-                    #dbc.Switch(label=video_or_image_lable, id='v_or_i', style={"margin-left": "5px"}),
-                    #html.P(id="standalone-radio-check-output"),
-                ]),
-            dbc.Col(dbc.ButtonGroup(children=[
-                    dbc.Button('Preview Video/Image', id='url_p', n_clicks=0)
-                    #dbc.Button('Add to batch', id='url_d', n_clicks=0, style={"margin-left": "5px"})
-                    # dbc.Button('Clean Batch', id='url_clean', n_clicks=0, style={"margin-left": "5px"}),
-                    # dbc.Button('Browse Files', id='url_modal', n_clicks=0, style={"margin-left": "5px"}),
-                    # dbc.Button('Start Pipeline', id='url_s', n_clicks=0, style={"margin-left": "5px"})
-                    ]))
-            #dbc.Col()
-        ],
-        style={"margin-top": "25px", "margin-left": "0%"}
-    ),
-    dbc.Row(
-        [
-            dbc.Col(id='preview_layout',
-                    children="")
-        ],
-        style={"margin-left": "0%", "margin-right": "40%", "margin-top": "20px"}
-    ),
-    dbc.Row(
-        [
-            dbc.Col(
-                [
-                    dbc.ButtonGroup(children=[
-                        dbc.Button('Add to batch', id='url_d', n_clicks=0),
-                        dbc.Button('Clean Batch', id='url_clean',
-                                   n_clicks=0, style={"margin-left": "5px"}),
-                        #dbc.Button('Browse Files', id='url_browse', n_clicks=0, style={"margin-left": "5px"}),
-                        dbc.Button('Start Pipeline', id='url_s',
-                                   n_clicks=0, style={"margin-left": "20px"}),
-                        dbc.Button('Jobs status', id='url_mon',
-                                   n_clicks=0, style={"margin-left": "5px"})
-                    ]),
-                    dbc.ButtonGroup(children=[
-                        dbc.Button('Browse MSRVTT', id='url_browse',
-                                   n_clicks=0, style={"margin-left": "20px"}),
-                        dbc.Button('Browse HW2', id='url_browse_h',
-                                   n_clicks=0, style={"margin-left": "5px"})
-                    ])
-                ]
-            )
-        ],
-        style={"margin-top": "25px", "margin-left": "0%"}
-    ),
-    dbc.Row(
-        [
-            dbc.Col(id='main_layout',
-                    children=dbc.Table(table_header, bordered=False, dark=True, id='url_table'))
-        ], style={"margin-left": "0%", "margin-right": "22%", "margin-top": "20px"}
-    ),
-    dbc.Modal(
-        [
-            dbc.ModalHeader(dbc.ModalTitle(
-                "Local Dataset MSRVTT, selected files will be added to batch")),
-            dbc.ModalBody(children=dash_table.DataTable(id='files_table',
-                                                        columns=[
-                                                            {"name": "File name", "id": "fname"}, {
-                                                                "name": "Dataset", "id": "path"}
-                                                        ],
-                                                        style_header={
-                                                            'backgroundColor': 'rgb(30, 30, 30)',
-                                                            'color': 'dark'
-                                                        },
-                                                        style_data={
-                                                            'backgroundColor': 'rgb(30, 30, 30)',
-                                                            'color': 'dark'
-                                                        },
-                                                        data=local_files,
-                                                        editable=True,
-                                                        #filter_action="native",
-                                                        sort_action="native",
-                                                        sort_mode="multi",
-                                                        column_selectable="single",
-                                                        row_selectable="multi",
-                                                        row_deletable=True,
-                                                        selected_columns=[],
-                                                        selected_rows=[],
-                                                        page_action="native",
-                                                        page_current=0,
-                                                        page_size=30,
-                                                        )),
-        ],
-        id="modal-xl",
-        size="xl",
-        is_open=False,
-    ),
-    dbc.Modal(
-        [
-            dbc.ModalHeader(dbc.ModalTitle(
-                "Local HW2 Dataset, selected files will be added to batch")),
-            dbc.ModalBody(children=dash_table.DataTable(id='files_table_hw',
-                                                        columns=[
-                                                            {"name": "File name", "id": "fname"}, {
-                                                                "name": "Dataset", "id": "path"}
-                                                        ],
-                                                        style_header={
-                                                            'backgroundColor': 'rgb(30, 30, 30)',
-                                                            'color': 'dark'
-                                                        },
-                                                        style_data={
-                                                            'backgroundColor': 'rgb(30, 30, 30)',
-                                                            'color': 'dark'
-                                                        },
-                                                        data=local_files_hw,
-                                                        editable=True,
-                                                        #filter_action="native",
-                                                        sort_action="native",
-                                                        sort_mode="multi",
-                                                        column_selectable="single",
-                                                        row_selectable="multi",
-                                                        row_deletable=True,
-                                                        selected_columns=[],
-                                                        selected_rows=[],
-                                                        page_action="native",
-                                                        page_current=0,
-                                                        page_size=30,
-                                                        )),
-        ],
-        id="modal-xl-hw",
-        size="xl",
-        is_open=False,
-    ),
-    dbc.Modal(
-        [
-            dbc.ModalHeader(
-                dbc.ModalTitle("Start Status"), close_button=True
-            ),
-            dbc.ModalBody(
-                "Job status: ", id="status"
-            ),
-            dbc.ModalFooter(),
-        ],
-        id="modal-dismiss",
-        #is_open=False,
-    ),
-    dbc.Modal(
-        [
-            dbc.ModalHeader(
-                dbc.ModalTitle("Job Status"), close_button=True
-            ),
-            dbc.ModalBody(
-                "Job status: ", id="job_status"
-            ),
-            dbc.ModalFooter(dbc.Button(
-                'All successed jobs', id='all_jobs', n_clicks=0, style={"margin-left": "5px"})),
-        ],
-        id="modal-job-status",
-        size="xl",
-        #is_open=False,
-    ),
-    dcc.Store(id='intermediate-value')
-]
 
 movies_table = dash_table.DataTable(id='movies_table', columns=[
     {"name": "URL", "id": "path", "type": "text", "presentation": "markdown"}
@@ -416,83 +260,7 @@ mdfs_data = html.Div(
 
 graph_data = dcc.Store(id='graph-data')
 
-results_layout = [
-    # dbc.Row(
-    #     [
-    #         dbc.Col(
-    #             [
-    #                 #dcc.Dropdown([{"label":"SELECTED", "value": "SELECTED"}], id='pipelines-dropdown',),
-    #                 dbc.Button('Refresh movies', id='refresh_movies',
-    #                            n_clicks=0, style={"margin-top": "5px"}),
-    #                 # dbc.Button('Refresh jobs', id='refresh_jobs',
-    #                 #            n_clicks=0, style={"margin-top": "5px"})
-    #             ], style={"margin-left": "5px", "margin-right": "50%", "margin-bottom": "20px"})
-    #     ],
-    # ),
-    # dbc.Row(
-    # [
-    #     dbc.Col(movies_table)
-    # ],
-    # ),
-    dbc.Row(
-        [
-            dbc.Col([movies_table]),
-            dbc.Col(id='res_preview_layout',
-                    children="")  # , style={"margin-right": "25%", "margin-left": "25%"})
-        ]
-    ),
-    dbc.Row(
-        dbc.ButtonGroup(children=[dbc.Button('View', id='view_results', n_clicks=0), dbc.Button('Refresh', id='refresh_movies',
-        n_clicks=0)]), style={"margin-top": "5px", "margin-right": "85%", "margin-left": "5px"}),
-    dbc.Modal(
-        [
-            dbc.ModalHeader(
-                dbc.ModalTitle("View MDFS"), close_button=True
-            ),
-            dbc.ModalBody(
-                mdfs_data, id="mdfs_slider"
-            ),
-            dbc.ModalFooter([""]),
-        ],
-        is_open=False,
-        id="view_mdf",
-        size="xl",
-    ),
-    graph_data
-]
 
-
-config_layout = [dbc.Row(
-    [
-        dbc.Col([dbc.Input(
-                id="input_database",
-                type="url",
-                placeholder="DB Name",
-                ),
-        ])
-    ],
-),
-    dbc.Row(
-    [
-        dbc.Col([dbc.Input(
-                id="input_web_server",
-                type="url",
-                placeholder="Web Server",
-                ),
-        ])
-    ],
-),
-    dbc.Row(
-    [
-        dbc.Col([dbc.Input(
-                id="input_dataset_name",
-                type="url",
-                placeholder="Dataset",
-                ),
-        ])
-    ],
-),
-]
 
 main_layout = html.Div(
     [
@@ -500,15 +268,22 @@ main_layout = html.Div(
                    html.H3('NEBULA Project')]),
         dbc.Tabs(
             [
-                dbc.Tab(pipeline_layout, label="Pipeline", tab_id="tab-1",
+                # dbc.Tab(pipeline_layout, label="Pipeline", tab_id="tab-1",
+                #         style={"margin-left": "10%", "margin-right": "20%", "margin-top": "40px"}),
+                dbc.Tab(pipeline_view.render_pipeline_content(), label="Pipeline", tab_id="tab-1",
                         style={"margin-left": "10%", "margin-right": "20%", "margin-top": "40px"}),
-                dbc.Tab(results_layout, label="Results Browser", tab_id="tab-2",
+                # dbc.Tab(results_layout, label="Results Browser", tab_id="tab-2",
+                #         style={"margin-left": "10%", "margin-right": "0%", "margin-top": "40px"}),
+                dbc.Tab(results_view.render_results_content(pipelines_ok, movies_table, mdfs_data, graph_data),
+                        label="Results Browser", tab_id="tab-2",
                         style={"margin-left": "10%", "margin-right": "0%", "margin-top": "40px"}),
                 dbc.Tab(label="Benchmark", tab_id="tab-3",
                         style={"margin-left": "10%", "margin-right": "0%", "margin-top": "40px"}),
-                dbc.Tab(label="Jobs Data", tab_id="tab-4",
+                dbc.Tab(jobs_view.render_jobs_content(), label="Jobs Data", tab_id="tab-4",
                         style={"margin-left": "20%", "margin-right": "10%", "margin-top": "40px"}),
-                dbc.Tab(config_layout, label="Config", style={
+                # dbc.Tab(config_layout, label="Config", style={
+                #         "margin-left": "20%", "margin-right": "10%", "margin-top": "40px"}, tab_id="tab-5")
+                dbc.Tab(config_view.render_config_content(), label="Config", style={
                         "margin-left": "20%", "margin-right": "10%", "margin-top": "40px"}, tab_id="tab-5")
             ],
             id="tabs",
@@ -569,34 +344,6 @@ def toggle_browser(n1, is_open):
     if n1:
         return not is_open, []
     return is_open, []
-
-# @app.callback(
-#     Output('pipelines-dropdown', "options"),
-#     Input("refresh_jobs", "n_clicks"),
-#     Input("tabs","active_tab")
-# )
-# def refresh_jobs(n1, at):
-#     pipelines = [{"label":"SELECTED", "value": "SELECTED"}]
-#     if "refresh_jobs" == ctx.triggered_id:
-#         #pipelines, pipelines_failed = get_pipelines()
-#         return(pipelines)
-#     if at == "tab-2":
-#         #pipelines, pipelines_failed = get_pipelines()
-#         return(pipelines)
-
-@app.callback(
-    Output('movies_table', "data"),
-    Input("refresh_movies", "n_clicks"),
-    Input("tabs","active_tab")
-)
-def refresh_movies(n1, at):
-    if "refresh_movies" == ctx.triggered_id:
-        all_movies, all_results = get_movies()
-        return(all_movies)
-    if at == "tab-2":
-        all_movies, all_results = get_movies()
-        print(all_movies)
-        return(all_movies)
 
 @app.callback(
     Output("modal-xl", "is_open"),
@@ -855,7 +602,7 @@ def return_mdfs_carousel(movie_id):
     mdf_graph = cyto.Cytoscape(
         id='cytoscape-mdf',
         layout={'name': 'grid'},
-        style={'width': '100%', 'height': '400px'},
+        style={'width': '50%', 'height': '400px'},
         elements=mdf_elements
     )
 
