@@ -9,7 +9,7 @@ class ResultsView():
         super(ResultsView, self).__init__()
         self.db = db
 
-    def render_results_content(self, pipelines_ok, movies_table, mdfs_data, graph_data):
+    def render_results_content(self, pipelines_ok, movies_table, mdfs_data, gt_graph_data, graph_data, gt_data, gn_data):
         return html.Div([
             dbc.Row(
                 [
@@ -23,7 +23,7 @@ class ResultsView():
             dbc.Modal(
                 [
                     dbc.ModalHeader(
-                        dbc.ModalTitle("View MDFS"), close_button=True
+                        dbc.ModalTitle("MDFS"), close_button=True
                     ),
                     dbc.ModalBody(
                         mdfs_data, id="mdfs_slider"
@@ -34,5 +34,8 @@ class ResultsView():
                 id="view_mdf",
                 size="xl",
             ),
-            graph_data
+            graph_data,
+            gt_graph_data,
+            gt_data,
+            gn_data
         ])
