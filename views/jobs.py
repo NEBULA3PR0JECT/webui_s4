@@ -7,4 +7,4 @@ class JobsView(object):
         super(JobsView, self).__init__()
 
     def render_jobs_content(self):
-        return html.Div("children", id="gradient-jobs")
+        return html.Div("Loading", id="gradient-jobs")

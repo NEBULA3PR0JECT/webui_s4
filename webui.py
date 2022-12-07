@@ -17,6 +17,7 @@ from views.config import ConfigView
 from views.pipeline import PipelineView
 from views.results import ResultsView
 from views.jobs import JobsView
+from views.benchmark import BenchmarkView
 from datetime import datetime
 
 arango_host = "http://172.83.9.249:8529"
@@ -76,6 +77,7 @@ config_view = ConfigView()
 pipeline_view = PipelineView(db)
 results_view = ResultsView(db)
 jobs_view = JobsView()
+benchmark_view = BenchmarkView()
 
 def start_job_rest():
     movies = []
@@ -183,6 +185,46 @@ def get_grnd_trht(image_url):
         return(mdfs)
     else:
         return([])
+
+def get_stats_mdf(image_url):
+    image_id = image_url.split("/")[-1].split(".")[0]
+    #print(image_id)
+    if image_id.isdigit():
+        #print("      VG Image Id", image_id)
+        stats = []
+        for res in db.collection("s4_eval_output").find({'image_id': image_id}):
+            #print("GT: ",res)
+            stats.append(res)
+        return(stats)
+    else:
+        return([])
+
+def get_all_stats():
+    all_stats = []
+    benchmark_tags = []
+    benchmark_names = []
+    benchmark_data = []
+    for res in db.collection("s4_eval_output").all():
+        all_stats.append(res)
+        benchmark_tags.append(res['benchmark_tag'])
+        benchmark_names.append(res['benchmark_name'])
+    
+    benchmark_tags = list(dict.fromkeys(benchmark_tags)) 
+    benchmark_names = list(dict.fromkeys(benchmark_names))
+
+    for benchmark_name in benchmark_names:
+        for benchmark_tag in benchmark_tags:
+            mean_recalls = 0
+            mean_precisions = 0
+            for stat in all_stats:
+                #print(stat)
+                if stat['benchmark_tag'] == benchmark_tag and stat['benchmark_name'] == benchmark_name:
+                    mean_precisions = mean_precisions + stat['mean_precision']
+                    mean_recalls = mean_recalls + stat['mean_recall']
+            global_precision = mean_precisions / len(all_stats)
+            global_recall = mean_recalls / len(all_stats)
+            benchmark_data.append({'name': benchmark_name,'tag': benchmark_tag, 'precision': global_precision,'recall':global_recall})
+    return(benchmark_data)
 
 all_movies, all_results = get_movies()
 pipelines_ok, pipelines_failed = get_pipelines()
@@ -300,8 +342,8 @@ main_layout = html.Div(
                         gt_graph_data, graph_data, gt_data, gn_data),
                         label="Results Browser", tab_id="tab-2",
                         style={"margin-left": "10%", "margin-right": "0%", "margin-top": "40px"}),
-                dbc.Tab(label="Benchmark", tab_id="tab-3",
-                        style={"margin-left": "10%", "margin-right": "0%", "margin-top": "40px"}),
+                dbc.Tab(benchmark_view.render_benchmark_content(), label="Benchmark", tab_id="tab-3",
+                        style={"margin-left": "10%", "margin-right": "10%", "margin-top": "40px"}),
                 dbc.Tab(jobs_view.render_jobs_content(), label="Jobs Data", tab_id="tab-4",
                         style={"margin-left": "10%", "margin-right": "10%", "margin-top": "40px"}),
                 # dbc.Tab(config_layout, label="Config", style={
@@ -601,9 +643,17 @@ def return_mdfs_carousel(movie_id):
     #print("DEBUG", movie_id)
     if "path" in movie_id:
         grnd_trht = get_grnd_trht(movie_id['path'])
+        stats = get_stats_mdf(movie_id['path'])
     else:
         grnd_trht = []
-    #print(grnd_trht)
+        stats = []
+    if len(stats) > 0:
+        mean_precision = stats[0]['mean_precision']
+        mean_recall = stats[0]['mean_recall']
+    else:
+        mean_precision = 0
+        mean_recall = 0
+    #print("STATS: ", stats)
     mdf_items = []
     mdf_options = []
     mdf_triplets = []
@@ -621,13 +671,13 @@ def return_mdfs_carousel(movie_id):
         mdf_options.append({"label":"MDF" + str(i), "value": i})
         if 'triplets' in mdf:
             mdf_triplets.append(mdf['triplets'])
-        mdf_gen_captions.append("Genereted Caption: " + mdf['candidate'])
+        mdf_gen_captions.append("Generated Caption:   " + mdf['candidate'])
     
     for i, gtmdf in enumerate(grnd_trht):
         #print("DEBUG MDF ", mdf)
         if 'triplets' in gtmdf:
             gt_triplets.append(gtmdf['triplets'])
-        mdf_gt_captions.append("GroundTruth Caption: " + gtmdf['ipc_caption'])
+        mdf_gt_captions.append("GroundTruth Caption:   " + gtmdf['ipc_caption'])
 
     mdf_carousel = dbc.Carousel(
         items=mdf_items,
@@ -660,11 +710,17 @@ def return_mdfs_carousel(movie_id):
 
     mdfs_data = html.Div(
         [
-            dbc.Row(mdf_rbuttons, style={'margin-top': '20px'}),
-            dbc.Row("Movie ID: " + movie_id['id'], style={'margin-top': '20px'}),
+            dbc.Row(mdf_rbuttons, style={'margin-top': '10px'}),
             dbc.Row(
                 [
-                dbc.Col(mdf_carousel, style={'margin-top': '20px'}),
+                dbc.Col("Movie ID: " + movie_id['id']),# style={'margin-top': '20px'}),
+                dbc.Col(html.B("Mean Recall: " + str(mean_recall))),
+                dbc.Col(html.B("Mean Precision: " + str(mean_precision)))
+                ]
+                ),
+            dbc.Row(
+                [
+                dbc.Col(mdf_carousel, style={'margin-top': '10px'}),
                 dbc.Col(id='gen-captions',
                         children=""),
                 dbc.Col(id='gt-captions',
@@ -674,8 +730,8 @@ def return_mdfs_carousel(movie_id):
             #dbc.Row(mdf_carousel, style={'margin-top': '20px'}),
             dbc.Row(
                 [
-                dbc.Col([html.P("Generated Graph"),mdf_graph], style={'margin-top': '20px'}),
-                dbc.Col([html.P("GroundTruth Graph"),gt_graph], style={'margin-top': '20px'}),
+                dbc.Col([html.P("Generated Graph"),mdf_graph], style={'margin-top': '10px'}),
+                dbc.Col([html.P("GroundTruth Graph"),gt_graph], style={'margin-top': '10px'}),
                 ]
                 )
 
@@ -743,7 +799,7 @@ def select_slide(idx, gn_data, gt_data, graph_element, gt_graph_element):
     Output("gradient-jobs", "children"), 
     [Input("tabs", "active_tab")]
     )
-def switch_tab(at):
+def switch_tab_jobs(at):
     table_header = [
     html.Thead(html.Tr([html.Th("Pipeline ID"), html.Th("Status"), html.Th("Started"),html.Th("Finished"),
     html.Th("Elapsed Time"),html.Th("Job"), html.Th("Status"), html.Th("Started"),html.Th("Finished"),html.Th("Elapsed Time") ]))
@@ -788,6 +844,29 @@ def switch_tab(at):
             
             table_body = [html.Tbody(table_data)]
             table = dbc.Table(table_header + table_body, bordered=True)
+        return(table)
+    else:
+        return("")
+
+@app.callback(
+    Output("benchmarks", "children"), 
+    [Input("tabs", "active_tab")]
+    )
+def switch_tab_benchmark(at):
+    table_header = [
+    html.Thead(html.Tr([html.Th("Benchmark Name"), html.Th("Benchmark Tag"), html.Th("Average Mean Recall"),
+    html.Th("Average Mean Precision"),]))
+    ]   
+    table_data = []
+    if at == "tab-3":
+        all_benchmark_data = get_all_stats()
+        for benchmark_data in all_benchmark_data:
+            row1 = html.Tr([html.Td(benchmark_data['name']), html.Td(benchmark_data['tag']),
+                html.Td(benchmark_data['recall']),html.Td(benchmark_data['precision']), 
+            ])
+            table_data.append(row1)
+        table_body = [html.Tbody(table_data)]
+        table = dbc.Table(table_header + table_body, bordered=True)
         return(table)
     else:
         return("")
