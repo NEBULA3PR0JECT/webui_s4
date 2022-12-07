@@ -223,7 +223,7 @@ def get_all_stats():
                     mean_recalls = mean_recalls + stat['mean_recall']
             global_precision = mean_precisions / len(all_stats)
             global_recall = mean_recalls / len(all_stats)
-            benchmark_data.append({'name': benchmark_name,'tag': benchmark_tag, 'precision': global_precision,'recall':global_recall})
+            benchmark_data.append({'name': benchmark_name,'tag': benchmark_tag, 'precision': global_precision,'recall':global_recall, 'frames': len(all_stats)})
     return(benchmark_data)
 
 all_movies, all_results = get_movies()
@@ -854,14 +854,14 @@ def switch_tab_jobs(at):
     )
 def switch_tab_benchmark(at):
     table_header = [
-    html.Thead(html.Tr([html.Th("Benchmark Name"), html.Th("Benchmark Tag"), html.Th("Average Mean Recall"),
+    html.Thead(html.Tr([html.Th("Benchmark Name"), html.Th("Benchmark Tag"), html.Th("Frames Number"), html.Th("Average Mean Recall"),
     html.Th("Average Mean Precision"),]))
     ]   
     table_data = []
     if at == "tab-3":
         all_benchmark_data = get_all_stats()
         for benchmark_data in all_benchmark_data:
-            row1 = html.Tr([html.Td(benchmark_data['name']), html.Td(benchmark_data['tag']),
+            row1 = html.Tr([html.Td(benchmark_data['name']), html.Td(benchmark_data['tag']),html.Td(benchmark_data['frames']),
                 html.Td(benchmark_data['recall']),html.Td(benchmark_data['precision']), 
             ])
             table_data.append(row1)
