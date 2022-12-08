@@ -186,6 +186,13 @@ def get_grnd_trht(image_url):
     else:
         return([])
 
+def get_conclusion(movie_id):
+    mdfs = []
+    for res in db.collection("llm_weak_sim_conclusion").find({'movie_id': movie_id}):
+        print("Conclusion : ",res)
+        mdfs.append(res['conclusion'])
+    return(mdfs)
+
 def get_stats_mdf(image_url):
     image_id = image_url.split("/")[-1].split(".")[0]
     #print(image_id)
@@ -639,11 +646,13 @@ def view_mdfs(n1, is_open):
     Input('movie-id', 'data')
 )
 def return_mdfs_carousel(movie_id):
+    conclusions = []
     mdfs = get_mdfs(movie_id['id'])
     #print("DEBUG", movie_id)
     if "path" in movie_id:
         grnd_trht = get_grnd_trht(movie_id['path'])
         stats = get_stats_mdf(movie_id['path'])
+        conclusions = get_conclusion(movie_id['id'])
     else:
         grnd_trht = []
         stats = []
@@ -662,13 +671,22 @@ def return_mdfs_carousel(movie_id):
     gt_elements = []
     mdf_gen_captions = []
     mdf_gt_captions = []
-
+    print("DEBUG Concl ", conclusions)
+    #"caption": "Conclusion: " + conclusions[i]
+   
     for i, mdf in enumerate(mdfs):
         #print("DEBUG MDF ", mdf)
-        mdf_items.append({"key":str(i), "src":mdf['url'],
-            "header": "Frame " + str(mdf['frame_num']), 
-            "img_style":{"max-height":"320px",'align': 'center',"max-width":"320px"}})
+        if len(conclusions) == len(mdfs):
+            mdf_items.append({"key":str(i), "src":mdf['url'],
+                "header": "Frame " + str(mdf['frame_num']), "caption": "Conclusion: " + conclusions[i],
+                "img_style":{"max-height":"320px",'align': 'center',"max-width":"320px"}})
+        else:
+            mdf_items.append({"key":str(i), "src":mdf['url'],
+                "header": "Frame " + str(mdf['frame_num']), 
+                "img_style":{"max-height":"320px",'align': 'center',"max-width":"320px"}})
+        
         mdf_options.append({"label":"MDF" + str(i), "value": i})
+        
         if 'triplets' in mdf:
             mdf_triplets.append(mdf['triplets'])
         mdf_gen_captions.append("Generated Caption:   " + mdf['candidate'])
@@ -817,29 +835,45 @@ def switch_tab_jobs(at):
                 pl_id = wf['spec']['defaults']['env']['PIPELINE_ID'] 
             print(pl_id)
             
-            print(wf['status']['phase'])
-            print(wf['status']['started'])
-            print(wf['status']['finished'])
-            min1 = int(wf['status']['started'].split(":")[1])
-            min2 = int(wf['status']['finished'].split(":")[1])
-            print("elapsed time: ", min2-min1)
+            # print(wf['status']['phase'])
+            # print(wf['status']['started'])
+            # print(wf['status']['finished'])
+            if "started" in wf['status'] and "finished" in wf['status']:
+                min1 = int(wf['status']['started'].split(":")[1])
+                min2 = int(wf['status']['finished'].split(":")[1])
+                started = wf['status']['started']
+                finished = wf['status']['finished']
+                print("elapsed time: ", min2-min1)
+            else:
+                min1 = 0
+                min2 = 0
+                started = "UNKNOWN"
+                finished = "UNKNOWN"
             row1 = html.Tr([html.Td(pl_id), html.Td(wf['status']['phase']),
-            html.Td(wf['status']['started']),html.Td(wf['status']['finished']), 
+            html.Td(started),html.Td(finished), 
             html.Td(min2-min1),html.Td(""),html.Td(""),html.Td(""),html.Td(""),html.Td("")])
             table_data.append(row1)
             for job in wf['status']['jobs'].keys():
-                print(job)
-                print("       ",wf['status']['jobs'][job]['phase'])
-                print("       ",wf['status']['jobs'][job]['started'])
-                print("       ",wf['status']['jobs'][job]['finished'])
-                min1 = int(wf['status']['jobs'][job]['started'].split(":")[1])
-                min2 = int(wf['status']['jobs'][job]['finished'].split(":")[1])
-                print("elapsed time: ", min2-min1)
+                if "started" in wf['status']['jobs'][job] and "finished" in wf['status']['jobs'][job]:
+                    print(job)
+                    # print("       ",wf['status']['jobs'][job]['phase'])
+                    # print("       ",wf['status']['jobs'][job]['started'])
+                    # print("       ",wf['status']['jobs'][job]['finished'])
+                    min1 = int(wf['status']['jobs'][job]['started'].split(":")[1])
+                    min2 = int(wf['status']['jobs'][job]['finished'].split(":")[1])
+                    started = wf['status']['jobs'][job]['started']
+                    finished = wf['status']['jobs'][job]['finished']
+                else:
+                    min1 = 0 
+                    min2 = 0
+                    started = "UNKNOWN"
+                    finished = "UNKNOWN"
+                    print("elapsed time: ", min2-min1)
                 row2 = html.Tr([html.Td(""), html.Td(""),
                     html.Td(""),html.Td(""), 
                     html.Td(""),html.Td(job),html.Td(wf['status']['jobs'][job]['phase']),
-                    html.Td(wf['status']['jobs'][job]['started']),
-                    html.Td(wf['status']['jobs'][job]['finished']),html.Td( min2-min1)])
+                    html.Td(started),
+                    html.Td(finished),html.Td( min2-min1)])
                 table_data.append(row2)
             
             table_body = [html.Tbody(table_data)]

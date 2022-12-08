@@ -1,5 +1,5 @@
 from dash import Dash, dcc, html
-
+import dash_bootstrap_components as dbc
 
 
 class JobsView(object):
@@ -7,4 +7,4 @@ class JobsView(object):
         super(JobsView, self).__init__()
 
     def render_jobs_content(self):
-        return html.Div("Loading", id="gradient-jobs")
+        return(dbc.Spinner(html.Div("Loading", id="gradient-jobs"),spinner_style={"width": "6rem", "height": "6rem"}))
