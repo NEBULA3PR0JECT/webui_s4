@@ -163,7 +163,8 @@ def get_movies():
         #print(movie)
         if movie['_id'] in results_idx:
             if 'name' in movie and 'url_path' in movie:
-                movies.append({'path': movie['url_path'], 'id': movie['_id']})
+                movies.append({'path': movie['url_path'], 'movie_id': movie['_id'], 'id': movie['_id'],
+                'b_name': movie['misc']['benchmark_name'], 'b_tag':movie['misc']['benchmark_tag']})
         #else:
             #print('Not found in res: ', movie['_id'])
     return(movies[::-1], results)
@@ -193,18 +194,18 @@ def get_conclusion(movie_id):
         mdfs.append(res['conclusion'])
     return(mdfs)
 
-def get_stats_mdf(image_url):
-    image_id = image_url.split("/")[-1].split(".")[0]
+def get_stats_mdf(movie_id):
+    #image_id = image_url.split("/")[-1].split(".")[0]
     #print(image_id)
-    if image_id.isdigit():
+    #if image_id.isdigit():
         #print("      VG Image Id", image_id)
-        stats = []
-        for res in db.collection("s4_eval_output").find({'image_id': image_id}):
-            #print("GT: ",res)
-            stats.append(res)
-        return(stats)
-    else:
-        return([])
+    stats = []
+    for res in db.collection("s4_eval_output").find({'movie_id': movie_id}):
+        #print("GT: ",res)
+        stats.append(res)
+    return(stats)
+    # else:
+    #     return([])
 
 def get_all_stats():
     all_stats = []
@@ -220,6 +221,7 @@ def get_all_stats():
     benchmark_names = list(dict.fromkeys(benchmark_names))
 
     for benchmark_name in benchmark_names:
+        count = 0
         for benchmark_tag in benchmark_tags:
             mean_recalls = 0
             mean_precisions = 0
@@ -228,9 +230,10 @@ def get_all_stats():
                 if stat['benchmark_tag'] == benchmark_tag and stat['benchmark_name'] == benchmark_name:
                     mean_precisions = mean_precisions + stat['mean_precision']
                     mean_recalls = mean_recalls + stat['mean_recall']
-            global_precision = mean_precisions / len(all_stats)
-            global_recall = mean_recalls / len(all_stats)
-            benchmark_data.append({'name': benchmark_name,'tag': benchmark_tag, 'precision': global_precision,'recall':global_recall, 'frames': len(all_stats)})
+                    count = count + 1
+            global_precision = mean_precisions / count
+            global_recall = mean_recalls / count
+            benchmark_data.append({'name': benchmark_name,'tag': benchmark_tag, 'precision': global_precision,'recall':global_recall, 'frames': count})
     return(benchmark_data)
 
 all_movies, all_results = get_movies()
@@ -245,7 +248,10 @@ st_layout = dbc.Table(table_header, bordered=False, dark=True, id='url_table')
 
 
 movies_table = dash_table.DataTable(id='movies_table', columns=[
-    {"name": "URL", "id": "path", "type": "text", "presentation": "markdown"}
+    {"name": "URL", "id": "path", "type": "text", "presentation": "markdown"},
+    {"name": "MovieID", "id": "movie_id", "type": "text", "presentation": "markdown"},
+    {"name": "Benchmark Name", "id": "b_name", "type": "text", "presentation": "markdown"},
+    {"name": "Benchmark Tag", "id": "b_tag", "type": "text", "presentation": "markdown"},
     #{"name":"Movie id", "id": "fid", "presentation": "markdown"},{"name":"File name", "id": "fname", "presentation": "markdown"}, {"name": "URL", "id": "path", "type":"text", "presentation": "markdown"}
 ],
     style_header={
@@ -651,7 +657,7 @@ def return_mdfs_carousel(movie_id):
     #print("DEBUG", movie_id)
     if "path" in movie_id:
         grnd_trht = get_grnd_trht(movie_id['path'])
-        stats = get_stats_mdf(movie_id['path'])
+        stats = get_stats_mdf(movie_id['id'])
         conclusions = get_conclusion(movie_id['id'])
     else:
         grnd_trht = []
