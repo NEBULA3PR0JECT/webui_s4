@@ -13,7 +13,7 @@ class ResultsView():
         return html.Div([
             dbc.Row(
                 [
-                    dbc.Col(dbc.Spinner([movies_table])),
+                    dbc.Col(dbc.Spinner([movies_table],spinner_style={"width": "6rem", "height": "6rem"})),
                     dbc.Col(id='res_preview_layout',
                             children="")  # , style={"margin-right": "25%", "margin-left": "25%"})
                 ]

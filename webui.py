@@ -27,6 +27,7 @@ web_server_prefix = 'http://74.82.29.209:9000/'
 movie_id = ""
 api_key='fdcd43409325ce4d47e6dc1aa911df'
 workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
+#workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
 project_id = 'pizybutannx'
 workflow_client = WorkflowsClient(api_key)
 
@@ -64,9 +65,10 @@ wf_template = {
         }
     }
 }
+dbname = "ipc_200"
 
 client = ArangoClient(hosts=arango_host)
-db = client.db("ipc_200", username='nebula', password='nebula')
+db = client.db(dbname, username='nebula', password='nebula')
 
 def get_workflow_gradient():
     all_wfs =  workflow_client.list_runs(workflow_id=workflow_id)
@@ -96,6 +98,24 @@ def start_job_rest():
         'http://74.82.28.218:48005/process/movies', json=payload, headers=headers)
     return response.json()
 
+def create_specs(pipeline_id, dataset_name, database_name):
+    #URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/sprint4.yaml"
+    URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/upload_workflow.yaml"
+    final_yaml_dictionary = {}
+    yamldct = {}
+    #Read the yml from GitHub
+    response = requests.get(URL)
+    yaml_content = response.text
+    yamldct = yaml.safe_load(yaml_content)
+    yamldct['defaults']['env']['ARANGO_DB']=database_name
+    yamldct['defaults']['env']['PIPELINE_ID']=pipeline_id
+    yamldct['defaults']['env']['DATASET_NAME']=dataset_name
+    yamldct['defaults']['env']['DATASET_PATH']='/inputs/data/'
+    yamldct['defaults']['env']['EXPERT_RUN_MODE'] = "task"
+    final_yaml_dictionary.update({'inputs': {'data': {'type':'dataset', 'with': {'ref': "dswj72z5idxczs9"}}}})
+    final_yaml_dictionary.update(yamldct)
+    #print(yaml.dump(final_yaml_dictionary, sort_keys=False))
+    return(final_yaml_dictionary)
 
 def start_job():
     movies = []
@@ -104,32 +124,30 @@ def start_job():
 
     for movie in batch_url_list:
         if movie.split('.')[-1] == 'mp4' or movie.split('.')[-1] == 'avi':
-            _movie = {"movie_id": "", "url": movie, "type": "video"}
-        else:
             _movie = {"movie_id": "", "url": movie, "type": "movie"}
+        else:
+            _movie = {"movie_id": "", "url": movie, "type": "image"}
         movies.append(_movie)
     pipeline_entry = wf_template
     pipeline_entry['inputs']['videoprocessing']['movies'] = movies
-
     pipeline_entry['id'] = str(uuid.uuid4())
     pipeline_entry['_key'] = pipeline_entry['id']
     db.collection("pipelines").insert(pipeline_entry)
-    spec_path_in = "./" + pipeline_entry['id'] + "_workflow-spec.yaml"
-    URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/sprint4.yaml"
-    response = requests.get(URL)
-    content = response.text.replace(
-        "PIPELINE_ID: \"123456789\"", "PIPELINE_ID: " + "\"" + pipeline_entry['id'] + "\"")
-    #print(content)
-    f = open(spec_path_in, "w")
-    f.write(content)
-    f.close()
-    # spec_path = "./workflow-spec.yaml"
-    yaml_spec = open(spec_path_in, 'r')
-    spec = yaml.safe_load(yaml_spec)
-
+    # spec_path_in = "./" + pipeline_entry['id'] + "_workflow-spec.yaml"
+    # URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/sprint4.yaml"
+    # response = requests.get(URL)
+    # content = response.text.replace(
+    #     "PIPELINE_ID: \"123456789\"", "PIPELINE_ID: " + "\"" + pipeline_entry['id'] + "\"")
+    # #print(content)
+    # f = open(spec_path_in, "w")
+    # f.write(content)
+    # f.close()
+    # # spec_path = "./workflow-spec.yaml"
+    # yaml_spec = open(spec_path_in, 'r')
+    spec = create_specs(pipeline_entry['id'],"WebUI", dbname)
     #print(pipeline_entry)
     intermediate_value = workflow_client.run_workflow(
-        workflow_id='cdc9127e-6c61-43b2-95fc-ba3ea1708950',
+        workflow_id=workflow_id,
         spec=spec,
         inputs=None
     )
@@ -220,21 +238,27 @@ def get_all_stats():
     
     benchmark_tags = list(dict.fromkeys(benchmark_tags)) 
     benchmark_names = list(dict.fromkeys(benchmark_names))
-
+    
     for benchmark_name in benchmark_names:
-        count = 0
+        
         for benchmark_tag in benchmark_tags:
             mean_recalls = 0
             mean_precisions = 0
+            count = 0
             for stat in all_stats:
                 #print(stat)
                 if stat['benchmark_tag'] == benchmark_tag and stat['benchmark_name'] == benchmark_name:
                     mean_precisions = mean_precisions + stat['mean_precision']
                     mean_recalls = mean_recalls + stat['mean_recall']
                     count = count + 1
-            global_precision = mean_precisions / count
-            global_recall = mean_recalls / count
-            benchmark_data.append({'name': benchmark_name,'tag': benchmark_tag, 'precision': global_precision,'recall':global_recall, 'frames': count})
+            if count > 0:
+                global_precision = mean_precisions / count
+                global_recall = mean_recalls / count
+                benchmark_data.append({'name': benchmark_name,'tag': benchmark_tag, 'precision': global_precision,'recall':global_recall, 'frames': count})
+            # else:
+            #     global_precision = 0
+            #     global_recall = 0
+            
     return(benchmark_data)
 
 all_movies, all_results = get_movies()
@@ -264,20 +288,20 @@ movies_table = dash_table.DataTable(id='movies_table', columns=[
     'color': 'dark',
     'whiteSpace': 'normal',
     'height': 'auto',
-    'maxWidth': '40px',
+    #'maxWidth': '40px',
     'lineHeight': '15px',
 },
-    style_cell_conditional=[
-    {'if': {'column_id': 'URL'},
-     'width': '30px'}
-],
+#     style_cell_conditional=[
+#     {'if': {'column_id': 'URL'},
+#      'width': '30px'}
+# ],
     #fixed_rows={'headers': True},
     markdown_options={"html": True},
     data=all_movies,
     editable=False,
-    filter_action="native",
-    sort_action="native",
-    sort_mode="multi",
+    #filter_action="native",
+    #sort_action="native",
+    #sort_mode="multi",
     column_selectable="single",
     row_selectable="single",
     row_deletable=False,
@@ -926,8 +950,8 @@ def switch_tab_benchmark(at):
 def switch_tab_results(at):
     if at == "tab-2":
         all_movies, all_results = get_movies()
-        print("DEBUG - SWITCH TO RESULTS")
-        print("ALL-M", all_movies)
+        #print("DEBUG - SWITCH TO RESULTS")
+        #print("ALL-M", all_movies)
         return(all_movies)
 
 if __name__ == "__main__":
