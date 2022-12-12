@@ -156,6 +156,7 @@ def get_movies():
     results = []
     movie_idx = []
     results_idx = []
+    print("DEBUG-REFRESHING MOVIES TABLE")
     for res in db.collection("s4_llm_output").all():
         results.append(res)
         results_idx.append(res['movie_id'])
@@ -165,8 +166,8 @@ def get_movies():
             if 'name' in movie and 'url_path' in movie:
                 movies.append({'path': movie['url_path'], 'movie_id': movie['_id'], 'id': movie['_id'],
                 'b_name': movie['misc']['benchmark_name'], 'b_tag':movie['misc']['benchmark_tag']})
-        #else:
-            #print('Not found in res: ', movie['_id'])
+        else:
+            print('Not found in res: ', movie['_id'])
     return(movies[::-1], results)
 
 def get_mdfs(movie_id):
@@ -294,7 +295,8 @@ mdf_carousel = dbc.Carousel(
         {"key": "3", "src": "/static/images/slide1.svg"}
     ],
     controls=False,
-    indicators=False,
+    #indicators=True,
+    #variant="dark",
     id="mdfs_car"
 )
 mdf_rbuttons = dbc.RadioItems(
@@ -338,11 +340,16 @@ graph_data = dcc.Store(id='graph-data')
 gt_graph_data = dcc.Store(id='gt-graph-data')
 gt_data = dcc.Store(id='gt-data')
 gn_data = dcc.Store(id='gn-data')
-
+#<a href=\"https://colab.research.google.com/github/dsivov/Nebula/blob/master/reid_view.ipynb\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>
+colab_link1 = html.A("ReID Colab Notebook", href="https://colab.research.google.com/github/hanochk/Masters/blob/master/reid_view.ipynb",
+title="ReId Colab", target="_parent", style={"margin-left": "1%"})
+colab_link2 = html.A("Upload Colab Notebook", href="https://colab.research.google.com/github/NEBULA3PR0JECT/nebula3_pipeline/blob/main/notebooks/nebula_upload_dataset.ipynb",
+title="Upload Colab", target="_parent", style={"margin-left": "50%"})
+github_link = html.A("Nebula GitHub", href="https://github.com/NEBULA3PR0JECT", target="_parent", style={"margin-left": "1%"})
 main_layout = html.Div(
     [
         dbc.Navbar(dark=True, color="dark", children=[
-                   html.H3('NEBULA Project')]),
+                   html.H2('NEBULA Project'),colab_link2, colab_link1, github_link]),
         dbc.Tabs(
             [
                 # dbc.Tab(pipeline_layout, label="Pipeline", tab_id="tab-1",
@@ -684,7 +691,7 @@ def return_mdfs_carousel(movie_id):
         #print("DEBUG MDF ", mdf)
         if len(conclusions) == len(mdfs):
             mdf_items.append({"key":str(i), "src":mdf['url'],
-                "header": "Frame " + str(mdf['frame_num']), "caption": "Conclusion: " + conclusions[i],
+                #"header": "Conclusion: " + conclusions[i], "caption": "",
                 "img_style":{"max-height":"320px",'align': 'center',"max-width":"320px"}})
         else:
             mdf_items.append({"key":str(i), "src":mdf['url'],
@@ -707,7 +714,8 @@ def return_mdfs_carousel(movie_id):
         items=mdf_items,
         #style={"width":"50%","height":"50%"},
         controls=False,
-        indicators=False,
+        #indicators=True,
+        #variant="dark",
         id="mdfs_car"
     )
 
@@ -910,6 +918,17 @@ def switch_tab_benchmark(at):
         return(table)
     else:
         return("")
+
+@app.callback(
+    Output("movies_table", "data"), 
+    [Input("tabs", "active_tab")]
+    )
+def switch_tab_results(at):
+    if at == "tab-2":
+        all_movies, all_results = get_movies()
+        print("DEBUG - SWITCH TO RESULTS")
+        print("ALL-M", all_movies)
+        return(all_movies)
 
 if __name__ == "__main__":
     app.run_server(host="0.0.0.0", port=8060, debug=True),
