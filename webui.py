@@ -184,14 +184,20 @@ def get_movies():
             if 'name' in movie and 'url_path' in movie:
                 movies.append({'path': movie['url_path'], 'movie_id': movie['_id'], 'id': movie['_id'],
                 'b_name': movie['misc']['benchmark_name'], 'b_tag':movie['misc']['benchmark_tag']})
-        else:
-            print('Not found in res: ', movie['_id'])
     return(movies[::-1], results)
 
 def get_mdfs(movie_id):
     mdfs = []
     for res in db.collection("s4_llm_output").find({'movie_id': movie_id}):
         mdfs.append(res)
+    return(mdfs)
+
+def get_reid_mdfs(movie_id):
+    mdfs = []
+    for res in db.collection("s4_re_id").find({'movie_id': movie_id}):
+        if len(res['urls']) > 0: 
+            for reid_mdf in res['urls']:
+                mdfs.append(reid_mdf)
     return(mdfs)
 
 def get_grnd_trht(image_url):
@@ -309,7 +315,7 @@ movies_table = dash_table.DataTable(id='movies_table', columns=[
     selected_rows=[],
     page_action="native",
     page_current=0,
-    page_size=10
+    page_size=15
 )
 
 mdf_carousel = dbc.Carousel(
@@ -685,6 +691,7 @@ def view_mdfs(n1, is_open):
 def return_mdfs_carousel(movie_id):
     conclusions = []
     mdfs = get_mdfs(movie_id['id'])
+    reid_mdfs = get_reid_mdfs(movie_id['id'])
     #print("DEBUG", movie_id)
     if "path" in movie_id:
         grnd_trht = get_grnd_trht(movie_id['path'])
@@ -708,19 +715,27 @@ def return_mdfs_carousel(movie_id):
     gt_elements = []
     mdf_gen_captions = []
     mdf_gt_captions = []
-    print("DEBUG Concl ", conclusions)
+    #print("DEBUG Concl ", conclusions)
     #"caption": "Conclusion: " + conclusions[i]
    
     for i, mdf in enumerate(mdfs):
-        #print("DEBUG MDF ", mdf)
-        if len(conclusions) == len(mdfs):
-            mdf_items.append({"key":str(i), "src":mdf['url'],
-                #"header": "Conclusion: " + conclusions[i], "caption": "",
-                "img_style":{"max-height":"320px",'align': 'center',"max-width":"320px"}})
-        else:
-            mdf_items.append({"key":str(i), "src":mdf['url'],
-                "header": "Frame " + str(mdf['frame_num']), 
-                "img_style":{"max-height":"320px",'align': 'center',"max-width":"320px"}})
+        orig_mdf_file = mdf['url'].split("/")[-1]
+        current_mdf_url = mdf['url']
+        for reid_mdf in reid_mdfs:
+            #print("DEBUG MDFS ", reid_mdf, " ",orig_mdf_file)
+            
+            if orig_mdf_file == reid_mdf['frame_number']:
+                current_mdf_url = reid_mdf['url']
+        print("DEBUG MDF ", current_mdf_url)
+            
+        # if len(conclusions) == len(mdfs):
+        #     mdf_items.append({"key":str(i), "src":mdf['url'],
+        #         #"header": "Conclusion: " + conclusions[i], "caption": "",
+        #         "img_style":{"max-height":"320px",'align': 'center',"max-width":"320px"}})
+        # else:
+        mdf_items.append({"key":str(i), "src":current_mdf_url,
+            "header": "Frame " + str(mdf['frame_num']), 
+            "img_style":{"max-height":"320px",'align': 'center',"max-width":"320px"}})
         
         mdf_options.append({"label":"MDF" + str(i), "value": i})
         
@@ -945,14 +960,17 @@ def switch_tab_benchmark(at):
 
 @app.callback(
     Output("movies_table", "data"), 
-    [Input("tabs", "active_tab")]
+    [
+    Input("tabs", "active_tab"),
+    Input("refresh_table", component_property='n_clicks'),
+    ]
     )
-def switch_tab_results(at):
-    if at == "tab-2":
+def switch_tab_results(at, n_clicks):
+    if at == "tab-2" or "refresh_table" == ctx.triggered_id:
         all_movies, all_results = get_movies()
         #print("DEBUG - SWITCH TO RESULTS")
         #print("ALL-M", all_movies)
         return(all_movies)
 
 if __name__ == "__main__":
-    app.run_server(host="0.0.0.0", port=8060, debug=True),
+    app.run_server(host="0.0.0.0", port=8070, debug=True),

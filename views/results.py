@@ -19,7 +19,9 @@ class ResultsView():
                 ]
             ),
             dbc.Row(
-                [dbc.Button('View results', id='view_results', n_clicks=0)], style={"margin-top": "5px", "margin-right": "85%", "margin-left": "5px"}),
+                dbc.ButtonGroup(children=[dbc.Button('View results', id='view_results', n_clicks=0),
+                dbc.Button('Refresh table', id='refresh_table', n_clicks=0)]),
+                style={"margin-top": "5px","margin-left": "0%", "margin-right": "80%"}),
             dbc.Modal(
                 [
                     dbc.ModalHeader(
