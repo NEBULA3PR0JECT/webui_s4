@@ -190,7 +190,8 @@ def get_mdfs(movie_id):
     mdfs = []
     for res in db.collection("s4_llm_output").find({'movie_id': movie_id}):
         mdfs.append(res)
-    return(mdfs)
+    newlist = sorted(mdfs, key=lambda d: d['frame_num'])
+    return(newlist)
 
 def get_reid_mdfs(movie_id):
     mdfs = []
@@ -973,4 +974,4 @@ def switch_tab_results(at, n_clicks):
         return(all_movies)
 
 if __name__ == "__main__":
-    app.run_server(host="0.0.0.0", port=8070, debug=True),
+    app.run_server(host="0.0.0.0", port=9060, debug=True),
