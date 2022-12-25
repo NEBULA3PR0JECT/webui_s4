@@ -720,13 +720,13 @@ def return_mdfs_carousel(movie_id):
     #"caption": "Conclusion: " + conclusions[i]
    
     for i, mdf in enumerate(mdfs):
-        orig_mdf_file = mdf['url'].split("/")[-1]
+        #orig_mdf_file = mdf['url'].split("/")[-1]
+        orig_mdf_file = mdf['frame_num']
         current_mdf_url = mdf['url']
         for reid_mdf in reid_mdfs:
-            #print("DEBUG MDFS ", reid_mdf, " ",orig_mdf_file)
-            
-            if orig_mdf_file == reid_mdf['frame_number']:
+            if orig_mdf_file == reid_mdf['frame_num']:
                 current_mdf_url = reid_mdf['url']
+                print("DEBUG MDFS ", reid_mdf, " ",orig_mdf_file)
         print("DEBUG MDF ", current_mdf_url)
             
         # if len(conclusions) == len(mdfs):
