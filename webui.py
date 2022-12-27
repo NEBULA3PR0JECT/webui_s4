@@ -739,7 +739,7 @@ def return_mdfs_carousel(movie_id):
             "img_style":{"max-height":"320px",'align': 'center',"max-width":"320px"}})
         
         mdf_options.append({"label":"MDF" + str(i), "value": i})
-        
+        #mdf_options.append(i)
         if 'triplets' in mdf:
             mdf_triplets.append(mdf['triplets'])
         mdf_gen_captions.append("Generated Caption:   " + mdf['candidate'])
@@ -759,11 +759,18 @@ def return_mdfs_carousel(movie_id):
         id="mdfs_car"
     )
 
-    mdf_rbuttons = dbc.RadioItems(
+    mdf_rbuttons = dcc.Slider(
+        0, len(mdf_options) - 1 , 1,
         id="mdf-number",
-        options=mdf_options,
+        tooltip={"placement": "top", "always_visible": True},
+        marks={
+        0: {'label': '0'},
+        len(mdf_options) - 1: {'label': str(len(mdf_options) - 1)}
+        },
+        className='dark-theme-control',
+        #value=mdf_options,
         value=0,
-        inline=True,
+        #inline=True,
     )
     #print(mdf_elements[0])
     mdf_graph = cyto.Cytoscape(
@@ -827,7 +834,7 @@ def select_slide(idx, gn_data, gt_data, graph_element, gt_graph_element):
     
     mdf_elements = []
     gt_elements = []
-    
+    print("DEBUG SLIDER ", idx)
     if graph_element is not None:
         if len(graph_element) > 0:
             #print("Graph Element:", graph_element[idx])
