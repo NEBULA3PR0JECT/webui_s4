@@ -19,18 +19,62 @@ from views.results import ResultsView
 from views.jobs import JobsView
 from views.benchmark import BenchmarkView
 from datetime import datetime
+import sys
 
-arango_host = "http://172.83.9.249:8529"
-w_server = 'http://74.82.29.209:9000/msrvtt/'
-hw2_w_server = 'http://74.82.29.209:9000/datasets/hollywood2/Hollywood2/AVIClips/'
-web_server_prefix = 'http://74.82.29.209:9000/'
-movie_id = ""
-api_key='fdcd43409325ce4d47e6dc1aa911df'
-workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
-#workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
-project_id = 'pizybutannx'
+PORT=0
+URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/dev_workflow.yml"
+if len(sys.argv) < 2:
+    print("Please run with one of following: demo, test or dev")
+    exit()
+elif sys.argv[1] == "demo":
+    URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/upload_workflow.yaml"
+    dbname = "web_demo"
+    arango_host = "http://172.83.9.249:8529"
+    w_server = 'http://74.82.29.209:9000/msrvtt/'
+    hw2_w_server = 'http://74.82.29.209:9000/datasets/hollywood2/Hollywood2/AVIClips/'
+    web_server_prefix = 'http://74.82.29.209:9000/'
+    movie_id = ""
+    api_key='fdcd43409325ce4d47e6dc1aa911df'
+    workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
+    #workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
+    project_id = 'pizybutannx'
+    PORT=8060
+    print("DEMO, PORT:", PORT, " DATABASE:", dbname)
+elif sys.argv[1] == "test":
+    URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/dev_workflow.yml"
+    dbname = "ipc_200"
+    arango_host = "http://172.83.9.249:8529"
+    w_server = 'http://74.82.29.209:9000/msrvtt/'
+    hw2_w_server = 'http://74.82.29.209:9000/datasets/hollywood2/Hollywood2/AVIClips/'
+    web_server_prefix = 'http://74.82.29.209:9000/'
+    movie_id = ""
+    api_key='fdcd43409325ce4d47e6dc1aa911df'
+    workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
+    #workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
+    project_id = 'pizybutannx'
+    PORT=8070
+    print("TEST, PORT:", PORT, " DATABASE:", dbname)
+elif sys.argv[1] == "dev":
+    URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/dev_workflow.yml"
+    print("DEV")
+    dbname = "ipc_200"
+    arango_host = "http://172.83.9.249:8529"
+    w_server = 'http://74.82.29.209:9000/msrvtt/'
+    hw2_w_server = 'http://74.82.29.209:9000/datasets/hollywood2/Hollywood2/AVIClips/'
+    web_server_prefix = 'http://74.82.29.209:9000/'
+    movie_id = ""
+    api_key='fdcd43409325ce4d47e6dc1aa911df'
+    workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
+    #workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
+    project_id = 'pizybutannx'
+    PORT=9060
+    print("DEV, PORT:", PORT, " DATABASE:", dbname)
+else:
+    print("No such env - ", sys.argv[1])
+    exit()
+
+
 workflow_client = WorkflowsClient(api_key)
-
 j_status = []
 j_status.append("")
 app = Dash(__name__, external_stylesheets=[dbc.themes.SLATE])
@@ -65,7 +109,6 @@ wf_template = {
         }
     }
 }
-dbname = "ipc_200"
 
 client = ArangoClient(hosts=arango_host)
 db = client.db(dbname, username='nebula', password='nebula')
@@ -100,7 +143,6 @@ def start_job_rest():
 
 def create_specs(pipeline_id, dataset_name, database_name):
     #URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/sprint4.yaml"
-    URL = "https://raw.githubusercontent.com/NEBULA3PR0JECT/nebula3_pipeline/main/upload_workflow.yaml"
     final_yaml_dictionary = {}
     yamldct = {}
     #Read the yml from GitHub
@@ -981,4 +1023,4 @@ def switch_tab_results(at, n_clicks):
         return(all_movies)
 
 if __name__ == "__main__":
-    app.run_server(host="0.0.0.0", port=9060, debug=True),
+    app.run_server(host="0.0.0.0", port=PORT, debug=True),
