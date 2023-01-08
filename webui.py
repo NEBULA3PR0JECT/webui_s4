@@ -49,7 +49,7 @@ elif sys.argv[1] == "test":
     web_server_prefix = 'http://74.82.29.209:9000/'
     movie_id = ""
     api_key='fdcd43409325ce4d47e6dc1aa911df'
-    workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
+    workflow_id='cdc9127e-6c61-43b2-95fc-ba3ea1708950'
     #workflow_id='893f5ef9-e652-4e93-97f3-9b65f62293f8'
     project_id = 'pizybutannx'
     PORT=8070
